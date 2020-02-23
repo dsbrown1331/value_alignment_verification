@@ -1,5 +1,6 @@
 import numpy as np
 import utils
+import copy
 
 #the following code is adapted from  erensezener/aima-based-irl 
 
@@ -9,9 +10,9 @@ class LinearFeatureGridWorld:
 
     def __init__(self, features, weights, initials, terminals, gamma=.95):
         self.features = features
-        self.weights = weights
+        self.weights = copy.copy(weights)
         self.initials=initials
-        self.actlist=[(1,0),(-1,0), (0,1), (0,-1)] #down, up, right, left
+        self.actlist=[(-1,0), (1,0), (0,-1), (0,1)] #up, down, left, right
         self.terminals=terminals
         self.gamma=gamma
         self.rows, self.cols = len(features), len(features[0])
@@ -20,12 +21,24 @@ class LinearFeatureGridWorld:
             for c in range(self.cols):
                 if features[r][c] is not None: #if features are None then there is an obstacle
                     self.states.add((r,c))
+
+        #human readable action mappings
+        self.chars = {(1, 0): 'v', (0, 1): '>', (-1, 0): '^', (0, -1): '<', None: '.'}
         
+    def get_num_features(self):
+        return len(self.weights)
+
+    def get_state_features(self, state):
+        r,c = state
+        return self.features[r][c]
 
     def R(self, state):
         "Return a numeric reward for this state."
         r,c = state
-        return np.dot(self.features[r][c], self.weights)
+        if self.features[r][c] is None:
+            return None
+        else:
+            return np.dot(self.features[r][c], self.weights)
 
     def T(self, state, action):
         if action == None:
@@ -57,15 +70,17 @@ class LinearFeatureGridWorld:
         """
         return a[0] + b[0], a[1] + b[1]
 
+    def to_arrow(self, action):
+        return self.chars[action]
+
 
     def to_arrows(self, policy):
-        chars = {(1, 0): 'v', (0, 1): '>', (-1, 0): '^', (0, -1): '<', None: '.'}
         policy_arrows = {}
         for (s,a_list) in policy.items():
             #concatenate optimal actions
             opt_actions = ""
             for a in a_list:
-                opt_actions+=chars[a]
+                opt_actions+=self.chars[a]
             policy_arrows[s] = opt_actions
         return policy_arrows
 
@@ -83,11 +98,20 @@ class LinearFeatureGridWorld:
         """take a 2-d array of values and print nicely"""
         for r in (range(self.rows)):
             for c in (range(self.cols)):
-                if type(array_2d[r][c]) is float:
-                    print("{:0.4f}".format(array_2d[r][c], 3), end="\t")
-                else:
+                if array_2d[r][c] is None:
                     print("{}".format(array_2d[r][c], 3), end="\t")
+                elif type(array_2d[r][c]) is int:
+                    print("{}".format(array_2d[r][c], 3), end="\t")
+                elif type(array_2d[r][c]) is str:
+                    print("{}".format(array_2d[r][c], 3), end="\t")
+                else:
+                    print("{:0.3f}".format(array_2d[r][c], 3), end="\t")
+                
+                    
             print()
+
+    
+         
 
     def print_map(self, mapping):
         array2d = self.to_grid(mapping)
@@ -95,10 +119,15 @@ class LinearFeatureGridWorld:
 
 
     def print_rewards(self):
-        for x in (range(self.rows)):
-            for y in (range(self.cols)):
-                print("{:0.4f}".format(self.R((x,y))), end="\t")
-            print()
+        for r in (range(self.rows)):
+            for c in (range(self.cols)):
+                reward = self.R((r,c))
+                #print((r,c), end="\t")
+                if reward is None: #wall obstacle
+                    print("None", end="\t")
+                else:
+                    print("{:0.2f}".format(reward), end="\t")
+            print("",end="\n")
 
     def get_grid_size(self):
         return len(self.grid), len(self.grid[0])
@@ -107,9 +136,66 @@ class LinearFeatureGridWorld:
 #______________________________________________________________________________
 
 
+def calculate_expected_feature_counts(pi, mdp, epsilon=0.00001):
+    """run policy evaluation but keep track of k-dimensional feature vectors rather than scalar values"""
+    T, gamma = mdp.T, mdp.gamma
+    num_features = mdp.get_num_features()
+    fcounts = dict([(s,np.zeros(num_features)) for s in mdp.states])
+    #print("num features", num_features)
+    while True:
+        #print "k", i
+        delta = 0
+        for s in mdp.states:
+            #print "s", s
+            #accumulate expected features of successor states
+            sum_next_state_features = np.zeros(num_features)
+            for opt_action in pi[s]:
+                for p,s1 in T(s, opt_action):
+                    sum_next_state_features += p * fcounts[s1]
+                    #print(sum_next_state_features)
+            sum_next_state_features /= len(pi[s])  #normalize since we assume equal probability of all optimal actions
+            #updated estimate
+            updated_fcounts = mdp.get_state_features(s) + gamma * sum_next_state_features
+            delta = max(delta, max(abs(fcounts[s] - updated_fcounts))) #check max change along feature vector
+            fcounts[s] = updated_fcounts
+        if delta < epsilon * (1 - gamma) / gamma:
+            return fcounts
+
+def calculate_sa_expected_feature_counts(pi, mdp, epsilon=0.00001):
+    """return dictionary of feature counts associated with each (s,a) pair"""
+    sa_fcounts = dict()
+    #compute feature expectations per state
+    fcounts = calculate_expected_feature_counts(pi, mdp, epsilon)
+    #(s,a) feature expectations are \phi(s) + \gamma * \sum_s' T(s,a,s') * fcounts[s']
+    for s in mdp.states:
+        for a in mdp.actions(s):
+            sa_fcounts[s,a] = mdp.get_state_features(s)
+            for p,s1 in mdp.T(s, a):
+                sa_fcounts[s,a] += mdp.gamma * p * fcounts[s1]
+    return sa_fcounts
 
 
-def value_iteration(mdp, epsilon=0.001):
+
+
+def value_iteration_inplace(mdp, epsilon=0.00001):
+    "Solving an MDP by value iteration."
+    V = dict([(s, 0) for s in mdp.states])
+    R, T, gamma = mdp.R, mdp.T, mdp.gamma
+    
+    while True:
+        delta = 0
+        for s in mdp.states:
+            updated_value = R(s) + gamma * max([sum([p * V[s1] for (p, s1) in T(s, a)])
+                                        for a in mdp.actions(s)])
+            delta = max(delta, abs(V[s] - updated_value))
+            V[s] = updated_value
+            
+        #print V1
+        if delta < epsilon * (1 - gamma) / gamma:
+            return V
+
+
+def value_iteration(mdp, epsilon=0.00001):
     "Solving an MDP by value iteration."
     V1 = dict([(s, 0) for s in mdp.states])
     R, T, gamma = mdp.R, mdp.T, mdp.gamma

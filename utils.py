@@ -1,3 +1,38 @@
+##utility functions for value alignment and mdps
+
+
+def display_onehot_state_features(mdp_world):
+    state_features = mdp_world.features
+    state_features_2d = []
+    for r in range(mdp_world.rows):
+        row_features = []
+        for c in range(mdp_world.cols):
+            row_features.append(state_features[r][c].index(1))
+        state_features_2d.append(row_features)
+    mdp_world.print_2darray(state_features_2d)
+
+
+
+
+
+
+def print_question(question, mdp_world):    
+    arrow = mdp_world.to_arrow #to make debugging actions human readable
+    if len(question) == 2:
+        (s,a), (s,b) = question
+        print("[{},{}] < [{},{}]".format(s,arrow(a),s,arrow(b)))
+    else:
+        (s,a), (s,b), equivalent = question
+        if equivalent:
+            print("[{},{}] = [{},{}]".format(s,arrow(a),s,arrow(b)))
+        else:
+            print("[{},{}] < [{},{}]".format(s,arrow(a),s,arrow(b)))
+
+
+
+
+
+
 #______________________________________________________________________________
 # Functions on sequences of numbers
 # NOTE: these take the sequence argument first, like min and max,
