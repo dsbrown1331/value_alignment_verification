@@ -1,0 +1,164 @@
+import experiment_utils as eutils
+import utils
+import mdp
+import machine_teaching
+import copy
+import numpy as np
+import value_alignment_verification as vav
+import alignment_heuristics as ah
+import random
+import sys
+
+#evaluate several different verification methods and compute accuracies
+
+
+def random_weights(num_features):
+    return 1.0 - 2.0 * np.random.rand(num_features)
+
+init_seed = 1234
+num_trials = 100  #number of mdps with random rewards to try
+num_policy_tries = 100
+debug = False
+num_rows_list = [i for i in range(2,4)]
+num_cols_list = [i for i in range(2,4)]
+num_features_list = [3]
+verifier_list = ["state-value-critical", "ranking-halfspace"]
+exp_data_dir = "./experiment_data/"
+critical_value_thresh = 0.1
+
+for num_features in num_features_list:
+    for num_rows in num_rows_list:
+        num_cols = num_rows #keep it square grid for  now
+
+        result_writers = []
+        for i, verifier_name in enumerate(verifier_list):
+            filename = "{}_states{}_features{}.txt".format(verifier_name, num_rows, num_features)
+            result_writers.append(open(exp_data_dir + filename,'w'))
+
+        for r_iter in range(num_trials):
+            print("="*10, r_iter, "="*10)
+            
+            ##For this test I want to verify that the ranking-based machine teaching is able to correctly verify whether an agent is value aligned or not.
+            #MDP is deterministic with fixed number or rows, cols, and features
+            #try a variable number of eval policies since bigger domains can have more possible policies
+            num_eval_policies_tries = num_features * num_rows * num_cols  #Note this isn't how many we'll actually end up with since we reject if same as optimal policy
+            initials = [(i,j) for i in range(num_rows) for j in range(num_cols)]
+            terminals = []#[(num_rows-1,num_cols-1)]
+            gamma = 0.9
+            seed = init_seed + r_iter 
+            if debug:
+                print("seed", seed)
+            np.random.seed(seed)
+            random.seed(seed)
+
+            #First let's generate a random MDP
+            state_features = eutils.create_random_features_row_col_m(num_rows, num_cols, num_features)
+            #print("state features\n",state_features)
+            true_weights = random_weights(num_features)
+            true_world = mdp.LinearFeatureGridWorld(state_features, true_weights, initials, terminals, gamma)
+            V = mdp.value_iteration(true_world)
+            Qopt = mdp.compute_q_values(true_world, V=V)
+            opt_policy = mdp.find_optimal_policy(true_world, Q = Qopt)
+            
+            if debug:
+                print("true weights: ", true_weights)  
+            
+                print("rewards")
+                true_world.print_rewards()
+                print("value function")
+            
+                true_world.print_map(V)
+                print("mdp features")
+                utils.display_onehot_state_features(true_world)
+            
+                print("optimal policy")
+                true_world.print_map(true_world.to_arrows(opt_policy))
+            
+            #now find a bunch of other optimal policies for the same MDP but with different weight vectors.
+            world = copy.deepcopy(true_world)
+            eval_policies = []
+            eval_Qvalues = []
+            eval_weights = []
+            num_eval_policies = 0
+            for i in range(num_eval_policies_tries):
+                #print("trying", i)
+                #change the reward weights
+                eval_weight_vector = random_weights(num_features)
+                world.weights = eval_weight_vector
+                #find the optimal policy under this MDP
+                Qval = mdp.compute_q_values(world)
+                eval_policy = mdp.find_optimal_policy(world, Q=Qval)
+                #only save if not equal to optimal policy
+                if eval_policy != opt_policy and eval_policy not in eval_policies:
+                    if debug:
+                        print("found distinct eval policy")
+                        world.print_map(world.to_arrows(eval_policy))
+                
+                    eval_policies.append(eval_policy)
+                    eval_Qvalues.append(Qval)
+                    eval_weights.append(eval_weight_vector)
+                    num_eval_policies += 1
+
+            print("There are {} distinct optimal policies".format(len(eval_policies)))
+            if len(eval_policies) == 0:
+                print("The only possible policy is the optimal policy. There must be a problem with the features. Can't do verification if only on policy possible!")
+                sys.exit()
+                
+
+            print()
+            print("Generating verification tests")
+
+            #TODO: run through all the verifiers and create tests for current MDP
+            #TODO: develop a common interface that they all implement 
+
+            
+            #TODO: have a list of names
+            for i, verifier_name in enumerate(verifier_list):
+                if verifier_name == "state-value-critical":
+                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh)
+                elif verifier_name == "ranking-halfspace":
+                    tester = vav.HalfspaceVerificationTester(true_world, debug = debug)
+
+                #checck optimal
+                verified = tester.is_agent_value_aligned(opt_policy, Qopt, true_weights)
+
+                #print(verified)
+                if not verified:
+                    print("testing true policy")
+                
+                    print("supposed to verify the optimal policy. This is not right!")
+                    input()
+
+                correct = 0.0
+                for i in range(num_eval_policies):
+                    
+                    #if debug:
+                    print("\ntesting agent", i)
+                    print("with reward weights:", eval_weights[i])
+                    print("agent policy")
+                    world.print_map(world.to_arrows(eval_policies[i]))
+                    print("compared to ")
+                    print("optimal policy")
+                    true_world.print_map(true_world.to_arrows(opt_policy))
+                    print("true reward weights:", true_weights)
+                    print("mdp features")
+                    utils.display_onehot_state_features(true_world)
+                    verified = tester.is_agent_value_aligned(eval_policies[i], eval_Qvalues[i], eval_weights[i])
+                    #print(verified)
+                    if verified:
+                        if debug:
+                            print("not supposed to be true...")
+                            input()
+                    if not verified:
+                        correct += 1.0
+                #TODO: how do I keep track of accuracy??
+                verifier_accuracy = correct / num_eval_policies
+                print("Accuracy = ", 100.0*verifier_accuracy)
+                #input()
+                
+                result_writers[i].write("{},{},{}\n".format(correct, num_eval_policies, size_verification_test))
+        for writer in result_writers:
+            writer.close()
+
+    #teacher = machine_teaching.RankingTeacher(world, debug=False)
+    #teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)

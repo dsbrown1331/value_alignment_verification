@@ -1,4 +1,15 @@
+import numpy as np
+
+def entropy(outcome_probs):
+    entropy = 0.0
+    for p in outcome_probs:
+        if p != 0:
+            entropy -= p * np.log(p)
+    return entropy
+
+
 ##utility functions for value alignment and mdps
+
 
 
 def display_onehot_state_features(mdp_world):

@@ -74,9 +74,11 @@ def is_redundant_constraint(h, H, epsilon=0.0001):
     #G = matrix(-H[:,non_zeros])
     b = np.zeros(m)
     sol = linprog(h, A_ub=-H, b_ub = b, bounds=(-1,1), method = 'revised simplex' )
-    #print(sol['fun'])
-    #print(sol['status'])
-    if sol['status'] != 0: #not sure what to do here. Shouldn't ever be infeasible
+    if sol['status'] != 0:
+        print("trying interior point method")
+        sol = linprog(h, A_ub=-H, b_ub = b, bounds=(-1,1) )
+    
+    if sol['status'] != 0: #not sure what to do here. Shouldn't ever be infeasible, so probably a numerical issue
         print("LP NOT SOLVABLE")
         sys.exit()
     elif sol['fun'] < -epsilon: #if less than zero then constraint is needed to keep c^T w >=0
@@ -117,7 +119,7 @@ def remove_redundant_constraints(halfspaces, epsilon = 0.0001):
     non_redundant_halfspaces = []
     halfspaces_to_check = halfspaces
     for i,h in enumerate(halfspaces):
-        #print("checking", h)
+        #print("\nchecking", h)
         halfspaces_lp = [h for h in non_redundant_halfspaces] + [h for h in halfspaces_to_check[1:]]
         halfspaces_lp = np.array(halfspaces_lp)
         #print(halfspaces_lp)

@@ -1,6 +1,7 @@
 import numpy as np
 import utils
 import copy
+import random
 
 #the following code is adapted from  erensezener/aima-based-irl 
 
@@ -268,19 +269,27 @@ def policy_evaluation(pi, U, mdp, k=100):
 #how to generate a demo from a start location
 ###TODO  this is for deterministic settings!!
 ###TODO add a terminationg criterion like value and policy iteration!
-def generate_demonstration(start, policy, mdp):
+def generate_demonstration(start, policy, mdp_world, horizon):
     """given a start location return the demonstration following policy
-    return a state action pair array"""
+    return a state action pair array
+    
+    trajectory is of length horizon
+    
+    """
     
     demonstration = []
     curr_state = start
     #print('start',curr_state)
-    
-    while curr_state not in mdp.terminals:
-        #print('action',policy[curr_state])
-        demonstration.append((curr_state, policy[curr_state]))
-        curr_state = mdp.go(curr_state, policy[curr_state])
+    steps = 0
+    while curr_state not in mdp_world.terminals and steps < horizon:
+        #print('actions',policy[curr_state])
+        a = random.sample(policy[curr_state],1)[0]
+        #print(a)
+        demonstration.append((curr_state, a))
+        curr_state = mdp_world.go(curr_state, a)
+        steps += 1
         #print('next state', curr_state)
-    #append the terminal state
-    demonstration.append((curr_state, None))
+    if curr_state in mdp_world.terminals:
+        #append the terminal state
+        demonstration.append((curr_state, None))
     return demonstration

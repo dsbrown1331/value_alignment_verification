@@ -143,7 +143,7 @@ def create_random_10x10_3feature():
     #features = [[w if np.random.rand() < 0.5 else r for _ in range(num_cols)] for i in range(num_rows)]
     weights = -np.random.rand(3)
     initials = [(num_rows-1,num_cols-1)]
-    terminals = [(0,0)]
+    terminals = []
     gamma = 0.99
     #Only requires 2-questions to teach (2-dim feature space)
     world = mdp.LinearFeatureGridWorld(features, weights, initials, terminals, gamma)
@@ -211,6 +211,46 @@ def create_multi_feature_world():
     return mdp.LinearFeatureGridWorld(features, weights, initials, terminals, gamma)
 #requires 18 questions to teach
 
+
+def debug_demonstrations():
+
+    world = create_random_10x10_3feature()
+
+
+    print("rewards")
+    world.print_rewards()
+
+    import time
+
+    print("values")
+    t0 = time.time()
+    V = mdp.value_iteration(world)
+    t1 = time.time()
+    world.print_map(V)
+    print(t1-t0)
+
+
+    
+    Q = mdp.compute_q_values(world, V)
+    #print("Q-values")
+    #print(Q)
+
+    print("optimal policy")
+    opt_policy = mdp.find_optimal_policy(world, Q=Q)
+    #print(opt_policy)
+    print("optimal policy")
+    world.print_map(world.to_arrows(opt_policy))
+
+    print(world.terminals)
+    
+    demo = mdp.generate_demonstration((4,4), opt_policy, world, 100)
+    for (s,a) in demo:
+        print("({},{})".format(s,world.to_arrow(a)))
+
+    #HMM. optimal demos can go for a long time, do we need them to last for infinite horizon??
+
+
+debug_demonstrations()
 # print("rewards")
 # world.print_rewards()
 # V = mdp.value_iteration(world)
@@ -246,7 +286,9 @@ def create_multi_feature_world():
 #world = create_aaai19_toy_world_3features()
 #world = create_3_feature_world()
 #world = create_random_10x10_2feature()
-#world = create_random_10x10_3feature()
+world = create_random_10x10_3feature()
+
+
 world = create_multiple_optimal_action_mdp()
 teacher = machine_teaching.RankingTeacher(world, debug=False)
 ##run this method if you want optimal for teaching BEC(\pi*) without boundary conditions.

@@ -7,13 +7,15 @@ import numpy as np
 import value_alignment_verification as vav
 import random
 import sys
+import alignment_heuristics as ah
 
 def random_weights(num_features):
     return 1.0 - 2.0 * np.random.rand(num_features)
 
-init_seed = 153
+init_seed = 34
 num_true_rewards = 100
 debug = False
+critical_threshold = .1
 
 for r_iter in range(num_true_rewards):
     print("="*10, r_iter, "="*10)
@@ -22,7 +24,7 @@ for r_iter in range(num_true_rewards):
     #MDP is deterministic with fixed number or rows, cols, and features
     num_rows = 10
     num_cols = 10
-    num_features = 5
+    num_features = 2
     num_eval_policies_tries = 100  #Note this isn't how many we'll actually end up with since we reject if same as optimal policy
     initials = [(num_rows // 2, num_cols // 2)]
     terminals = []#[(num_rows-1,num_cols-1)]
@@ -78,17 +80,31 @@ for r_iter in range(num_true_rewards):
             eval_weights.append(eval_weight_vector)
             num_eval_policies += 1
 
-    print("Running verification tests for {} distinct optimal policies for different reward weights.".format(len(eval_policies)))
+    print("There are {} distinct optimal policies".format(len(eval_policies)))
     if len(eval_policies) == 0:
         print("only one possible policy. There must be a problem with the features. Can't do verification if only on policy possible!")
         sys.exit()
         
 
 
-    print("\nGenerating machine teaching test")
-    tester = vav.OptimalRankingBasedTester(true_world, debug = debug, remove_redundancy_lp = False)
+    print("\nGenerating heuristic validation test")
+    tester = ah.CriticalStateActionValueVerifier(true_world, critical_threshold, debug = debug)
+    if debug:
+        print("true weights: ", true_weights)  
+        print("rewards")
+        true_world.print_rewards()
+        print("value function")
+        true_world.print_map(V)
+        print("mdp features")
+        utils.display_onehot_state_features(true_world)
+        print("optimal policy")
+        true_world.print_map(true_world.to_arrows(opt_policy))
+        
+        print(tester.critical_state_actions)
+        print(len(tester.critical_state_actions))
+        #input()
     print("testing true policy")
-    verified = tester.is_agent_value_aligned(Qopt)
+    verified = tester.is_agent_value_aligned(opt_policy)
     #print(verified)
     if not verified:
         print("supposed to verify the optimal policy. This is not right!")
@@ -96,25 +112,27 @@ for r_iter in range(num_true_rewards):
 
     correct = 0.0
     for i, Qeval in enumerate(eval_Qvalues):
-        if debug:
-            print("\ntesting agent", i)
-            print("with reward weights:", eval_weights[i])
-            print("agent policy")
-            world.print_map(world.to_arrows(eval_policies[i]))
-            print("compared to ")
-            print("optimal policy")
-            true_world.print_map(true_world.to_arrows(opt_policy))
-            print("true reward weights:", true_weights)
-            print("mdp features")
-            utils.display_onehot_state_features(true_world)
-        verified = tester.is_agent_value_aligned(Qeval)
+        #if debug:
+        print("\ntesting agent", i)
+        print("with reward weights:", eval_weights[i])
+        print("agent policy")
+        world.print_map(world.to_arrows(eval_policies[i]))
+        print("compared to ")
+        print("optimal policy")
+        true_world.print_map(true_world.to_arrows(opt_policy))
+        print("true reward weights:", true_weights)
+        print("mdp features")
+        utils.display_onehot_state_features(true_world)
+        agent_policy = eval_policies[i]
+        verified = tester.is_agent_value_aligned(agent_policy)
         #print(verified)
         if verified:
             print("not supposed to be true...")
-            input()
+            #input()
         if not verified:
             correct += 1
     print("Accuracy = ", 100.0*correct / num_eval_policies)
+    input("continue?")
     #input()
 
 

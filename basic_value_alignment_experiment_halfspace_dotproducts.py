@@ -86,9 +86,10 @@ for r_iter in range(num_true_rewards):
 
 
     print("\nGenerating machine teaching test")
-    tester = vav.OptimalRankingBasedTester(true_world, debug = debug, remove_redundancy_lp = False)
+    tester = vav.HalfspaceVerificationTester(true_world, debug = debug)
+
     print("testing true policy")
-    verified = tester.is_agent_value_aligned(Qopt)
+    verified = tester.is_agent_value_aligned(true_weights)
     #print(verified)
     if not verified:
         print("supposed to verify the optimal policy. This is not right!")
@@ -107,7 +108,7 @@ for r_iter in range(num_true_rewards):
             print("true reward weights:", true_weights)
             print("mdp features")
             utils.display_onehot_state_features(true_world)
-        verified = tester.is_agent_value_aligned(Qeval)
+        verified = tester.is_agent_value_aligned(eval_weights[i])
         #print(verified)
         if verified:
             print("not supposed to be true...")

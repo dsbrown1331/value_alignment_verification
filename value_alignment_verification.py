@@ -1,5 +1,55 @@
 import machine_teaching
 import utils
+import numpy as np
+from alignment_interface import Verifier
+
+class HalfspaceVerificationTester(Verifier):
+    """takes an MDP and an agent and tests whether the agent has value alignment
+       by taking the agent's reward function and testing whether it is in the BEC(\pi^*)
+    """
+    def __init__(self, mdp_world, precision = 0.0001, debug=False):
+        self.mdp_world = mdp_world
+        self.precision = precision
+        self.debug = debug
+        teacher = machine_teaching.RankingTeacher(mdp_world, debug=self.debug)
+
+        tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
+
+        #for now let's just select the first question for each halfspace
+        self.test = [questions[0] for questions in tests]
+
+    def is_agent_value_aligned(self, agent_reward_weights):
+
+        #test each halfspace, need to check if equivalence test or strict preference test by looking at the question
+        for i, question in enumerate(self.test):
+            if self.debug:
+                print("Testing question:")
+                utils.print_question(question, self.mdp_world)
+            
+            if len(question) == 2:
+                if np.dot(agent_reward_weights, self.halfspaces[i]) <= 0:
+                    if self.debug:
+                        print("wrong answer. dot product should be greater than zero")
+                    return False
+            else:
+                (s,worse), (s,better), equivalent = question
+                if equivalent:
+                    #if agent q-values are not within numerical precision of each other, then fail the agent
+                    if not np.dot(agent_reward_weights, self.halfspaces[i]) == 0:
+                        if self.debug:
+                            print("wrong answer. Should be equal")
+                        return False
+                else:
+                    #if better action q-value is not numerically significantly better, then fail the agent
+                    if np.dot(agent_reward_weights, self.halfspaces[i]) <= 0:
+                        if self.debug:
+                            print("wrong answer. dot product should be greater than zero")
+                        return False
+            if self.debug:
+                print("correct answer")
+        #only return true if not incorrect answers have been given.  
+        return True
+
 
 #TODO: debug this. I don't think it is correct yet...but maybe the machine teaching has a bug...
 #TODO should this even be a new tester. It seems like both should be the same...
@@ -14,7 +64,7 @@ class RankingBasedTester():
         self.debug = debug
         teacher = machine_teaching.RankingTeacher(mdp_world, debug=self.debug)
 
-        tests = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
+        tests, _ = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
         #for now let's just select the first question for each halfspace
         self.test = [questions[0] for questions in tests]
@@ -62,13 +112,13 @@ class OptimalRankingBasedTester():
     """takes an MDP and an agent and tests whether the agent has value alignment
        assumes that tests questions ask preferences over optimal versus other actions, test questions are which of these is optimal, possibly both
     """
-    def __init__(self, mdp_world, precision = 0.0001, debug=False):
+    def __init__(self, mdp_world, precision = 0.0001, debug=False, remove_redundancy_lp = True):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.RankingTeacher(mdp_world, debug=self.debug)
+        teacher = machine_teaching.StateActionRankingTeacher(mdp_world, debug=self.debug, remove_redundancy_lp = remove_redundancy_lp)
 
-        tests = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
+        tests, _ = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
         #for now let's just select the first question for each halfspace
         self.test = [questions[0] for questions in tests]
@@ -139,7 +189,7 @@ class OptimalRankingBasedTesterAll():
         self.debug = debug
         teacher = machine_teaching.RankingTeacher(mdp_world, debug=self.debug)
 
-        tests = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
+        tests, _ = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
         #The only difference is how we pick the test
         #for now let's just select the first question for each halfspace
