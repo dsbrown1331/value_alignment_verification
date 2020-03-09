@@ -22,6 +22,10 @@ class CriticalStateActionValueVerifier(Verifier):
                 self.critical_state_actions.append((s,best_action))
         print("Number of critical states", len(self.critical_state_actions))
 
+    def get_size_verification_test(self):
+        return len(self.critical_state_actions)
+
+
     def is_agent_value_aligned(self, agent_policy, agent_qvals, agent_reward_wts):
 
 

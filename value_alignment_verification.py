@@ -11,14 +11,17 @@ class HalfspaceVerificationTester(Verifier):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.RankingTeacher(mdp_world, debug=self.debug)
+        teacher = machine_teaching.TrajectoryRankingTeacher(mdp_world, debug=self.debug)
 
         tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
         #for now let's just select the first question for each halfspace
         self.test = [questions[0] for questions in tests]
 
-    def is_agent_value_aligned(self, agent_reward_weights):
+    def get_size_verification_test(self):
+        return len(self.test)
+
+    def is_agent_value_aligned(self,  agent_policy, agent_qvals, agent_reward_weights):
 
         #test each halfspace, need to check if equivalence test or strict preference test by looking at the question
         for i, question in enumerate(self.test):
