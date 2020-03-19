@@ -9,8 +9,8 @@ class CriticalStateActionValueVerifier(Verifier):
         self.critical_threshold = critical_threshold
         self.precision = precision
         self.debug = debug
-        self.q_values = mdp.compute_q_values(mdp_world)
-        self.optimal_policy = mdp.find_optimal_policy(mdp_world, Q=self.q_values)
+        self.q_values = mdp.compute_q_values(mdp_world, eps = precision)
+        self.optimal_policy = mdp.find_optimal_policy(mdp_world, Q=self.q_values, epsilon=precision)
 
         #find critical states
         self.critical_state_actions = []

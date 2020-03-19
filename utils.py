@@ -65,7 +65,7 @@ def argmin(seq, fn):
             best, best_score = x, x_score
     return best
 
-def argmin_list(seq, fn):
+def argmin_list(seq, fn, precision):
     """Return a list of elements of seq[i] with the lowest fn(seq[i]) scores.
     >>> argmin_list(['one', 'to', 'three', 'or'], len)
     ['to', 'or']
@@ -73,9 +73,9 @@ def argmin_list(seq, fn):
     best_score, best = fn(seq[0]), []
     for x in seq:
         x_score = fn(x)
-        if x_score < best_score:
+        if x_score < best_score - precision:
             best, best_score = [x], x_score
-        elif x_score == best_score:
+        elif abs(x_score - best_score) < precision:
             best.append(x)
     return best
 
@@ -100,12 +100,12 @@ def argmax(seq, fn):
     """
     return argmin(seq, lambda x: -fn(x))
 
-def argmax_list(seq, fn):
+def argmax_list(seq, fn, precision):
     """Return a list of elements of seq[i] with the highest fn(seq[i]) scores.
     >>> argmax_list(['one', 'three', 'seven'], len)
     ['three', 'seven']
     """
-    return argmin_list(seq, lambda x: -fn(x))
+    return argmin_list(seq, lambda x: -fn(x), precision)
 
 def argmax_random_tie(seq, fn):
     "Return an element with highest fn(seq[i]) score; break ties at random."

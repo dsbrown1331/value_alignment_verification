@@ -25,17 +25,17 @@ class StateActionRankingTeacher:
         if self.debug:
             print("rewards")
             world.print_rewards()
-        V = mdp.value_iteration(world)
-        self.Q = mdp.compute_q_values(world, V)
+        V = mdp.value_iteration(world, epsilon=epsilon)
+        self.Q = mdp.compute_q_values(world, V, eps=epsilon)
         if self.debug:
             print("values function")
             world.print_map(V)
 
-        opt_policy = mdp.find_optimal_policy(world, Q=self.Q)
+        opt_policy = mdp.find_optimal_policy(world, Q=self.Q, epsilon=epsilon)
         if self.debug:
             print("optimal policy")
             world.print_map(world.to_arrows(opt_policy))
-        self.sa_fcounts = mdp.calculate_sa_expected_feature_counts(opt_policy, world)
+        self.sa_fcounts = mdp.calculate_sa_expected_feature_counts(opt_policy, world, epsilon=epsilon)
         #print("expected feature counts")
         #for s,a in self.sa_fcounts:
         #    print("state {} action {} fcounts:".format(s, world.to_arrow(a)))
@@ -85,7 +85,8 @@ class StateActionRankingTeacher:
                                 half_spaces.append(normal_vector)
             else: #only consider optimal versus suboptimal halfspaces (what was done in AAAI'19 paper)
                 #find optimal action(s) for s
-                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a])
+                
+                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a], self.precision)
                 for opt_a in opt_actions:
                     for action_b in actions:
                         normal_vector = self.sa_fcounts[s, opt_a] - self.sa_fcounts[s, action_b]
@@ -221,7 +222,7 @@ class StateActionRankingTeacher:
                             self.try_to_add_to_test(normal_vector, ((s,action_i), (s,action_j)), test_questions, min_constraints)
             else: #only consider optimal versus other halfspaces (what was done in AAAI'19 paper)
                 #find optimal action(s) for s
-                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a])
+                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a], self.precision)
                 for opt_a in opt_actions:
                     for action_b in actions:
                         if action_b not in opt_actions:
@@ -310,17 +311,17 @@ class TrajectoryRankingTeacher:
         if self.debug:
             print("rewards")
             world.print_rewards()
-        V = mdp.value_iteration(world)
-        self.Q = mdp.compute_q_values(world, V)
+        V = mdp.value_iteration(world, epsilon=epsilon)
+        self.Q = mdp.compute_q_values(world, V, eps=epsilon)
         if self.debug:
             print("values function")
             world.print_map(V)
 
-        opt_policy = mdp.find_optimal_policy(world, Q=self.Q)
+        opt_policy = mdp.find_optimal_policy(world, Q=self.Q, epsilon=epsilon)
         if self.debug:
             print("optimal policy")
             world.print_map(world.to_arrows(opt_policy))
-        self.sa_fcounts = mdp.calculate_sa_expected_feature_counts(opt_policy, world)
+        self.sa_fcounts = mdp.calculate_sa_expected_feature_counts(opt_policy, world, epsilon=epsilon)
         #print("expected feature counts")
         #for s,a in self.sa_fcounts:
         #    print("state {} action {} fcounts:".format(s, world.to_arrow(a)))
@@ -370,7 +371,7 @@ class TrajectoryRankingTeacher:
                                 half_spaces.append(normal_vector)
             else: #only consider optimal versus suboptimal halfspaces (what was done in AAAI'19 paper)
                 #find optimal action(s) for s
-                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a])
+                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a], self.precision)
                 for opt_a in opt_actions:
                     for action_b in actions:
                         normal_vector = self.sa_fcounts[s, opt_a] - self.sa_fcounts[s, action_b]
@@ -507,7 +508,7 @@ class TrajectoryRankingTeacher:
                             self.try_to_add_to_test(normal_vector, ((s,action_i), (s,action_j)), test_questions, min_constraints)
             else: #only consider optimal versus other halfspaces (what was done in AAAI'19 paper)
                 #find optimal action(s) for s
-                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a])
+                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a], self.precision)
                 for opt_a in opt_actions:
                     for action_b in actions:
                         if action_b not in opt_actions:

@@ -5,13 +5,13 @@ from alignment_interface import Verifier
 
 class HalfspaceVerificationTester(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
-       by taking the agent's reward function and testing whether it is in the BEC(\pi^*)
+       by taking the agent's reward function and testing whether it is in the AEC(\pi^*)
     """
-    def __init__(self, mdp_world, precision = 0.0001, debug=False):
+    def __init__(self, mdp_world, precision, debug=False):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.TrajectoryRankingTeacher(mdp_world, debug=self.debug)
+        teacher = machine_teaching.TrajectoryRankingTeacher(mdp_world, debug=self.debug, epsilon=precision)
 
         tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
@@ -57,22 +57,25 @@ class HalfspaceVerificationTester(Verifier):
 #TODO: debug this. I don't think it is correct yet...but maybe the machine teaching has a bug...
 #TODO should this even be a new tester. It seems like both should be the same...
 #TODO: need a version for all pairwise preferences
-class RankingBasedTester():
+class RankingBasedTester(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
        assumes that tests are of the form of 
     """
-    def __init__(self, mdp_world, precision = 0.0001, debug=False):
+    def __init__(self, mdp_world, precision, debug=False):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.RankingTeacher(mdp_world, debug=self.debug)
+        teacher = machine_teaching.StateActionRankingTeacher(mdp_world, debug=self.debug, epsilon=precision)
 
         tests, _ = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
         #for now let's just select the first question for each halfspace
         self.test = [questions[0] for questions in tests]
 
-    def is_agent_value_aligned(self, agent_q_values):
+    def get_size_verification_test(self):
+        return len(self.test)
+
+    def is_agent_value_aligned(self, policy, agent_q_values, reward_weights):
 
         #Need to ask the agent what it would do in each setting. Need access to agent Q-values...
         for question in self.test:

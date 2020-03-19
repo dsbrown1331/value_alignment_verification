@@ -137,7 +137,7 @@ class LinearFeatureGridWorld:
 #______________________________________________________________________________
 
 
-def calculate_expected_feature_counts(pi, mdp, epsilon=0.00001):
+def calculate_expected_feature_counts(pi, mdp, epsilon=0.0001):
     """run policy evaluation but keep track of k-dimensional feature vectors rather than scalar values"""
     T, gamma = mdp.T, mdp.gamma
     num_features = mdp.get_num_features()
@@ -162,7 +162,7 @@ def calculate_expected_feature_counts(pi, mdp, epsilon=0.00001):
         if delta < epsilon * (1 - gamma) / gamma:
             return fcounts
 
-def calculate_sa_expected_feature_counts(pi, mdp, epsilon=0.00001):
+def calculate_sa_expected_feature_counts(pi, mdp, epsilon=0.0001):
     """return dictionary of feature counts associated with each (s,a) pair"""
     sa_fcounts = dict()
     #compute feature expectations per state
@@ -178,7 +178,7 @@ def calculate_sa_expected_feature_counts(pi, mdp, epsilon=0.00001):
 
 
 
-def value_iteration_inplace(mdp, epsilon=0.00001):
+def value_iteration_inplace(mdp, epsilon=0.0001):
     "Solving an MDP by value iteration."
     V = dict([(s, 0) for s in mdp.states])
     R, T, gamma = mdp.R, mdp.T, mdp.gamma
@@ -196,7 +196,7 @@ def value_iteration_inplace(mdp, epsilon=0.00001):
             return V
 
 
-def value_iteration(mdp, epsilon=0.00001):
+def value_iteration(mdp, epsilon=0.0001):
     "Solving an MDP by value iteration."
     V1 = dict([(s, 0) for s in mdp.states])
     R, T, gamma = mdp.R, mdp.T, mdp.gamma
@@ -212,10 +212,10 @@ def value_iteration(mdp, epsilon=0.00001):
             return V
 
 
-def compute_q_values(mdp, V=None):
+def compute_q_values(mdp, V=None, eps = 0.0001):
     if not V:
         #first we need to compute the value function
-        V = value_iteration(mdp)
+        V = value_iteration(mdp, epsilon=eps)
     Q = {}
     for s in mdp.states:
         for a in mdp.actions(s):
@@ -227,21 +227,21 @@ def compute_q_values(mdp, V=None):
 
 
 
-def find_optimal_policy(mdp, V=None, Q=None):
+def find_optimal_policy(mdp, V=None, Q=None, epsilon=0.0001):
     """Given an MDP and an optional value function V or optional Q-value function, determine the best policy,
     as a mapping from state to action."""
     #check if we need to compute Q-values
     if not Q:
         if not V:
-            Q = compute_q_values(mdp)
+            Q = compute_q_values(mdp, eps = epsilon)
         else:
-            Q = compute_q_values(mdp, V)
+            Q = compute_q_values(mdp, V, eps=epsilon)
 
     pi = {}
     for s in mdp.states:
         #find all optimal actions
 
-        pi[s] = utils.argmax_list(mdp.actions(s), lambda a: Q[s,a])
+        pi[s] = utils.argmax_list(mdp.actions(s), lambda a: Q[s,a], epsilon)
     return pi
 
 

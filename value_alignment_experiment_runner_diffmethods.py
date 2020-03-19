@@ -20,11 +20,13 @@ def random_weights(num_features):
 
 init_seed = 1234
 num_trials = 50  #number of mdps with random rewards to try
+num_eval_policies_tries = 50
 debug = False
+precision = 0.00001
 num_rows_list = [4,8,16]
-num_cols_list = [4,8,16]
+num_cols_list =[4,8,16]
 num_features_list = [2,3,4,5,6,7,8]
-verifier_list = ["state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
+verifier_list = ["state-optimal-action-ranker","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
 exp_data_dir = "./experiment_data/"
 
 
@@ -44,13 +46,12 @@ for num_features in num_features_list:
             ##For this test I want to verify that the ranking-based machine teaching is able to correctly verify whether an agent is value aligned or not.
             #MDP is deterministic with fixed number or rows, cols, and features
             #try a variable number of eval policies since bigger domains can have more possible policies (this is just a heuristic to make sure we try a lot but not as many for really small mdps)
-            num_eval_policies_tries = 50# 2 * num_features * num_rows * num_cols #Note this isn't how many we'll actually end up with since we reject if same as optimal policy
+            # 2 * num_features * num_rows * num_cols #Note this isn't how many we'll actually end up with since we reject if same as optimal policy
             initials = [(i,j) for i in range(num_rows) for j in range(num_cols)]
             terminals = []#[(num_rows-1,num_cols-1)]
             gamma = 0.9
             seed = init_seed + r_iter 
-            if debug:
-                print("seed", seed)
+            print("seed", seed)
             np.random.seed(seed)
             random.seed(seed)
 
@@ -59,9 +60,9 @@ for num_features in num_features_list:
             #print("state features\n",state_features)
             true_weights = random_weights(num_features)
             true_world = mdp.LinearFeatureGridWorld(state_features, true_weights, initials, terminals, gamma)
-            V = mdp.value_iteration(true_world)
-            Qopt = mdp.compute_q_values(true_world, V=V)
-            opt_policy = mdp.find_optimal_policy(true_world, Q = Qopt)
+            V = mdp.value_iteration(true_world, epsilon=precision)
+            Qopt = mdp.compute_q_values(true_world, V=V, eps=precision)
+            opt_policy = mdp.find_optimal_policy(true_world, Q = Qopt, epsilon=precision)
             
             if debug:
                 print("true weights: ", true_weights)  
@@ -89,8 +90,8 @@ for num_features in num_features_list:
                 eval_weight_vector = random_weights(num_features)
                 world.weights = eval_weight_vector
                 #find the optimal policy under this MDP
-                Qval = mdp.compute_q_values(world)
-                eval_policy = mdp.find_optimal_policy(world, Q=Qval)
+                Qval = mdp.compute_q_values(world, eps=precision)
+                eval_policy = mdp.find_optimal_policy(world, Q=Qval, epsilon=precision)
                 #only save if not equal to optimal policy
                 if eval_policy != opt_policy and eval_policy not in eval_policies:
                     if debug:
@@ -122,25 +123,26 @@ for num_features in num_features_list:
 
                 if verifier_name == "state-value-critical-1.0":
                     critical_value_thresh = 1.0
-                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh)
-                    size_verification_test = tester.get_size_verification_test()
+                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh, precision=precision)
+                    
                 elif verifier_name == "state-value-critical-0.5":
                     critical_value_thresh = 0.5
-                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh)
-                    size_verification_test = tester.get_size_verification_test()
+                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh, precision=precision)
+ 
                 elif verifier_name == "state-value-critical-0.1":
                     critical_value_thresh = 0.1
-                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh)
-                    size_verification_test = tester.get_size_verification_test()
+                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh, precision=precision)
+
                 elif verifier_name == "ranking-halfspace":
-                    tester = vav.HalfspaceVerificationTester(true_world, debug = debug)
-                    size_verification_test = tester.get_size_verification_test()
+                    tester = vav.HalfspaceVerificationTester(true_world, debug = debug, precision=precision)
+
                 elif verifier_name == "state-optimal-action-ranker":
-                    tester = vav.RankingBasedTester(true_world, debug=debug)
-                    size_verification_test = test.get_size_verification_test()
+                    tester = vav.RankingBasedTester(true_world, debug=debug, precision=precision)
+
                 else:
                     print("invalid verifier name")
                     sys.exit()
+                size_verification_test = tester.get_size_verification_test()
                 #checck optimal
                 verified = tester.is_agent_value_aligned(opt_policy, Qopt, true_weights)
 
