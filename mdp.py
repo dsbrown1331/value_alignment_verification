@@ -36,7 +36,7 @@ class LinearFeatureGridWorld:
     def R(self, state):
         "Return a numeric reward for this state."
         r,c = state
-        if self.features[r][c] is None:
+        if self.features[r][c] is None: #wall or inaccessible state due to barrier
             return None
         else:
             return np.dot(self.features[r][c], self.weights)

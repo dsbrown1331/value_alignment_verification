@@ -6,10 +6,8 @@ import sys
 from scipy.spatial import distance
 
 
-#TODO: implement for comparison
-class SCOT:
-    def __init__(self):
-        pass
+
+
 
 class StateActionRankingTeacher:
     """takes an mdp world and returns the optimal teaching solution to teach the MDP
@@ -31,11 +29,11 @@ class StateActionRankingTeacher:
             print("values function")
             world.print_map(V)
 
-        opt_policy = mdp.find_optimal_policy(world, Q=self.Q, epsilon=epsilon)
+        self.opt_policy = mdp.find_optimal_policy(world, Q=self.Q, epsilon=epsilon)
         if self.debug:
             print("optimal policy")
-            world.print_map(world.to_arrows(opt_policy))
-        self.sa_fcounts = mdp.calculate_sa_expected_feature_counts(opt_policy, world, epsilon=epsilon)
+            world.print_map(world.to_arrows(self.opt_policy))
+        self.sa_fcounts = mdp.calculate_sa_expected_feature_counts(self.opt_policy, world, epsilon=epsilon)
         #print("expected feature counts")
         #for s,a in self.sa_fcounts:
         #    print("state {} action {} fcounts:".format(s, world.to_arrow(a)))
@@ -580,3 +578,128 @@ class TrajectoryRankingTeacher:
                     utils.print_question(question, self.world)
 
         return alignment_test_questions, min_constraints
+
+
+class SCOT(StateActionRankingTeacher):
+    def __init__(self, world, precision, num_rollouts, rollout_length, debug=False):
+        super().__init__(world, precision, debug)
+        self.num_rollouts = num_rollouts
+        self.rollout_length = rollout_length
+
+    def generate_candidate_trajectories(self):
+        trajs = []
+        for s in self.world.states:
+            #check if initial state
+            if s in self.world.initials:
+                for k in range(self.num_rollouts):
+                    traj = mdp.generate_demonstration(s, self.opt_policy, self.world, self.rollout_length)
+                    trajs.append(traj)
+        return trajs
+
+
+    #NOTE: this doesn't remove redundancies but does remove duplicates
+    def get_all_constraints_traj(self, traj):
+        constraints = []
+        for s,a in traj:
+            if s not in self.world.terminals: #don't need to worry about terminals since all actions self loop with zero reward
+                for b in self.world.actions(s):
+                    normal_vector = self.sa_fcounts[s, a] - self.sa_fcounts[s, b]
+                    #don't add if zero
+                    if np.linalg.norm(normal_vector) > self.precision:
+                        constraints.append(normal_vector)
+
+        #preprocess by removing duplicates before running LP
+        #use cosine_dist for similarity
+        preprocessed_normals = []
+        for n in constraints:
+            already_in_list = False
+            #search through preprocessed_normals for close match
+            for pn in preprocessed_normals:
+                if distance.cosine(n, pn) < self.precision:
+                    already_in_list = True
+                    break
+            if not already_in_list:
+                #add to list
+                preprocessed_normals.append(n)
+
+        if self.debug: 
+            print("preprocessed normals before LP")
+            for pn in preprocessed_normals:
+                print(pn)
+
+        return preprocessed_normals    
+
+    def count_new_covers(self, constraints_new, constraint_set, covered):
+        #go through each element of constraints_new and see if it matches an uncovered element of constraint_set
+        count = 0
+        for c_new in constraints_new:
+            for i,c in enumerate(constraint_set):
+                #check if equal via cosine dist
+                if distance.cosine(c_new, c) < self.precision:
+                    #check if not covered yet
+                    if not covered[i]:
+                        count += 1
+        return count
+
+    def update_covered_constraints(self, constraints_added, constraint_set, covered):
+        for c_new in constraints_added:
+            for i,c in enumerate(constraint_set):
+                #check if equal via cosine dist
+                if distance.cosine(c_new, c) < self.precision:
+                    #check if not covered yet
+                    if not covered[i]:
+                        covered[i] = True
+        return covered
+
+    def get_machine_teaching_demos(self):
+        use_suboptimal_rankings = False
+        #get raw halfspace normals for all action pairs at each state
+        halfspace_normals = self.compute_halfspace_normals(use_suboptimal_rankings)
+        #np.random.shuffle(halfspace_normals)
+        ##Debug
+        if self.debug:
+            print("raw halfspace constraints")
+            for n in halfspace_normals:
+                print(n)
+
+
+        #preprocess them to remove any redundancies
+        constraint_set = self.preprocess_halfspace_normals(halfspace_normals)
+        
+        ##Debug
+        print(len(constraint_set), "non-redundant feature weight constraints after full preprocessing")
+        for n in constraint_set:
+            print(n)
+
+
+        #generate k trajectories of length H from each start state
+        candidate_trajs = self.generate_candidate_trajectories()
+
+        #create boolean bookkeeping to see what has been covered in the set
+        covered = [False for _ in constraint_set]
+        
+        #for each candidate demonstration trajectory check how many uncovered set elements it covers and find one with max added covers
+        total_covered = 0
+        opt_demos = []
+        while total_covered < len(constraint_set):
+            constraints_to_add = None
+            best_traj = None
+            max_count = 0
+            for traj in candidate_trajs:
+                #TODO: optimize by precomputing and saving this
+                constraints_new = self.get_all_constraints_traj(traj)
+ 
+                count = self.count_new_covers(constraints_new, constraint_set, covered)
+                if self.debug: print("covered", count)
+                if count > max_count:
+                    max_count = count
+                    constraints_to_add = constraints_new
+                    best_traj = traj
+
+            #update covered flags and add best_traj to demo`
+            opt_demos.append(best_traj)
+            covered = self.update_covered_constraints(constraints_to_add, constraint_set, covered)
+            total_covered += max_count
+            #TODO: optimize by removing trajs if we decide to add to opt_demos
+    
+        return opt_demos

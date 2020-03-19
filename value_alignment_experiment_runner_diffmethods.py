@@ -20,13 +20,18 @@ def random_weights(num_features):
 
 init_seed = 1234
 num_trials = 50  #number of mdps with random rewards to try
-num_eval_policies_tries = 50
+num_eval_policies_tries = 100
+
+#scot params
+num_rollouts = 15
+rollout_length = 40
+
 debug = False
 precision = 0.00001
-num_rows_list = [4,8,16]
-num_cols_list =[4,8,16]
-num_features_list = [2,3,4,5,6,7,8]
-verifier_list = ["state-optimal-action-ranker","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
+num_rows_list = [4,5,6]#[4,8,16]
+num_cols_list =[4,5,6]#[4,8,16]
+num_features_list = [4,5]#[2,3,4,5,6,7,8]
+verifier_list = ["scot"]#, "optimal_action_allquestions", "optimal_action","state-optimal-action-ranker","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
 exp_data_dir = "./experiment_data/"
 
 
@@ -136,13 +141,23 @@ for num_features in num_features_list:
                 elif verifier_name == "ranking-halfspace":
                     tester = vav.HalfspaceVerificationTester(true_world, debug = debug, precision=precision)
 
-                elif verifier_name == "state-optimal-action-ranker":
-                    tester = vav.RankingBasedTester(true_world, debug=debug, precision=precision)
+                elif verifier_name == "state-optimal-action_ranker":
+                    tester = vav.RankingBasedTester(true_world, precision, debug=debug)
 
+                elif verifier_name == "optimal_action":
+                    tester = vav.OptimalRankingBasedTester(true_world, precision, debug=debug)
+
+                elif verifier_name == "optimal_action_allquestions":
+                    tester = vav.OptimalRankingBasedTesterAll(true_world, precision, debug=debug)
+
+                elif verifier_name == "scot":
+                    tester = vav.SCOTVerificationTester(true_world, precision, num_rollouts, rollout_length, debug=debug)
+                
                 else:
                     print("invalid verifier name")
                     sys.exit()
                 size_verification_test = tester.get_size_verification_test()
+                print("number of questions", size_verification_test)
                 #checck optimal
                 verified = tester.is_agent_value_aligned(opt_policy, Qopt, true_weights)
 
@@ -170,9 +185,9 @@ for num_features in num_features_list:
                     verified = tester.is_agent_value_aligned(eval_policies[i], eval_Qvalues[i], eval_weights[i])
                     #print(verified)
                     if verified:
-                        if debug:
-                            print("not supposed to be true...")
-                            input()
+                        #if debug:
+                        print("not supposed to be true...")
+                        input()
                     if not verified:
                         correct += 1
                 #TODO: how do I keep track of accuracy??

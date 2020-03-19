@@ -2,6 +2,54 @@ import machine_teaching
 import utils
 import numpy as np
 from alignment_interface import Verifier
+import mdp
+
+class SCOTVerificationTester(Verifier):
+    """takes the machine teaching set of trajectories from SCOT and asks the agent being tested to fill in the actions it would take 
+        in each state
+    """
+    def __init__(self, mdp_world, precision, num_rollouts, rollout_length, debug=False):
+        self.mdp_world = mdp_world
+        self.precision = precision
+        self.debug = debug
+        self.q_values = mdp.compute_q_values(mdp_world, eps = precision)
+        self.optimal_policy = mdp.find_optimal_policy(mdp_world, Q=self.q_values, epsilon=precision)
+
+        teacher = machine_teaching.SCOT(mdp_world, precision, num_rollouts, rollout_length, debug=self.debug)
+
+        self.demos = teacher.get_machine_teaching_demos()
+        self.query_sa_pairs = set()
+        for d in self.demos:
+            for sa_pair in d:
+                self.query_sa_pairs.add(sa_pair)
+        
+        
+    def get_size_verification_test(self):
+        return len(self.query_sa_pairs) #count up total number of distinct states we ask for an action in 
+
+    def is_agent_value_aligned(self,  agent_policy, agent_qvals, agent_reward_weights):
+        #for each state in the demos from SCOT ask agent 
+        
+        for s,a in self.query_sa_pairs:
+            if self.debug:
+                print("Testing teaching state: ({}, {})".format(s, self.mdp_world.to_arrow(a)))
+                print("policy", agent_policy)
+                print(type(agent_policy[s]))
+            if type(agent_policy[s]) is list: #stochastic optimal policy
+                if a not in agent_policy[s]:
+                    if self.debug:
+                        print("Machine teaching action is not an optimal action for the agent")
+                    return False
+            else:
+                #just a deterministic policy
+                if a != agent_policy[s]:
+                    if self.debug:
+                        print("Machine teaching action is not the optimal action for the agent")
+                    return False
+        
+            if self.debug:
+                print("correct answer")
+        return True
 
 class HalfspaceVerificationTester(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
@@ -19,7 +67,7 @@ class HalfspaceVerificationTester(Verifier):
         self.test = [questions[0] for questions in tests]
 
     def get_size_verification_test(self):
-        return len(self.test)
+        return 1 #just needs to ask for reward weights
 
     def is_agent_value_aligned(self,  agent_policy, agent_qvals, agent_reward_weights):
 
@@ -54,12 +102,12 @@ class HalfspaceVerificationTester(Verifier):
         return True
 
 
-#TODO: debug this. I don't think it is correct yet...but maybe the machine teaching has a bug...
-#TODO should this even be a new tester. It seems like both should be the same...
+#
 #TODO: need a version for all pairwise preferences
 class RankingBasedTester(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
-       assumes that tests are of the form of 
+       assumes that tests are of the form of do you think action a is better than or equally preferred to action b?
+       Current implementation accesses agent's Q-values under the hood to test this
     """
     def __init__(self, mdp_world, precision, debug=False):
         self.mdp_world = mdp_world
@@ -114,22 +162,26 @@ class RankingBasedTester(Verifier):
 
 
 
-class OptimalRankingBasedTester():
+class OptimalRankingBasedTester(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
-       assumes that tests questions ask preferences over optimal versus other actions, test questions are which of these is optimal, possibly both
+       assumes that tests questions ask preferences over optimal versus other actions, 
+       test questions test which of these is optimal, possibly both
     """
-    def __init__(self, mdp_world, precision = 0.0001, debug=False, remove_redundancy_lp = True):
+    def __init__(self, mdp_world, precision, debug=False, remove_redundancy_lp = True):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.StateActionRankingTeacher(mdp_world, debug=self.debug, remove_redundancy_lp = remove_redundancy_lp)
+        teacher = machine_teaching.StateActionRankingTeacher(mdp_world, debug=self.debug, remove_redundancy_lp = remove_redundancy_lp, epsilon=precision)
 
         tests, _ = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
         #for now let's just select the first question for each halfspace
         self.test = [questions[0] for questions in tests]
 
-    def is_agent_value_aligned(self, agent_q_values):
+    def get_size_verification_test(self):
+        return len(self.test)
+
+    def is_agent_value_aligned(self, policy, agent_q_values, reward_weights):
 
         #Need to ask the agent what it would do in each setting. Need access to agent Q-values...
         for question in self.test:
@@ -184,16 +236,16 @@ class OptimalRankingBasedTester():
         return True
 
 
-class OptimalRankingBasedTesterAll():
+class OptimalRankingBasedTesterAll(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
        assumes that tests questions ask preferences over optimal versus other actions, test questions are which of these is optimal, possibly both
        asks all questions in test questions to try and prevent evaluation policy from diverging.
     """
-    def __init__(self, mdp_world, precision = 0.0001, debug=False):
+    def __init__(self, mdp_world, precision, debug=False):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.RankingTeacher(mdp_world, debug=self.debug)
+        teacher = machine_teaching.StateActionRankingTeacher(mdp_world, debug=self.debug, epsilon=precision)
 
         tests, _ = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
@@ -204,8 +256,13 @@ class OptimalRankingBasedTesterAll():
             self.test.extend(questions)
 
 
+    
+
+    def get_size_verification_test(self):
+        return len(self.test)
+
     #TODO: this part is the same so maybe try and refactor with a base or abstract class to inherit from
-    def is_agent_value_aligned(self, agent_q_values):
+    def is_agent_value_aligned(self, policy, agent_q_values, reward_weights):
 
         #Need to ask the agent what it would do in each setting. Need access to agent Q-values...
         for question in self.test:
