@@ -22,6 +22,8 @@ class SCOTVerificationTester(Verifier):
         for d in self.demos:
             for sa_pair in d:
                 self.query_sa_pairs.add(sa_pair)
+
+
         
         
     def get_size_verification_test(self):
@@ -29,6 +31,13 @@ class SCOTVerificationTester(Verifier):
 
     def is_agent_value_aligned(self,  agent_policy, agent_qvals, agent_reward_weights):
         #for each state in the demos from SCOT ask agent 
+        if self.debug:
+            print("demos")
+            for d in self.demos:
+                print(d)
+            print("SCOT testing states")
+            for s,a in self.query_sa_pairs:
+                print(s,self.mdp_world.to_arrow(a))
         
         for s,a in self.query_sa_pairs:
             if self.debug:

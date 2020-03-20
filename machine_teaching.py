@@ -672,6 +672,7 @@ class SCOT(StateActionRankingTeacher):
             print(n)
 
 
+
         #generate k trajectories of length H from each start state
         candidate_trajs = self.generate_candidate_trajectories()
 

@@ -19,19 +19,19 @@ def random_weights(num_features):
     #return 1.0 - 2.0 * np.random.rand(num_features)
 
 init_seed = 1234
-num_trials = 50  #number of mdps with random rewards to try
-num_eval_policies_tries = 50
+num_trials = 300  #number of mdps with random rewards to try
+num_eval_policies_tries = 300
 
 #scot params
-num_rollouts = 20
+num_rollouts = 15
 rollout_length = 40
 
-debug = False
+debug = True
 precision = 0.00001
-num_rows_list = [4,8,16]
-num_cols_list = [4,8,16]
-num_features_list = [2,3,4,5,6,7,8]
-verifier_list = ["scot", "optimal_action_allquestions", "optimal_action"]#,"state-optimal-action-ranker","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
+num_rows_list = [5,6,8,16]
+num_cols_list = [5,6,8,16]
+num_features_list = [3,4,5,6,7,8]
+verifier_list = ["scot"]#, "optimal_action_allquestions", "optimal_action","state-optimal-action-ranker","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
 exp_data_dir = "./experiment_data/"
 
 
@@ -39,13 +39,8 @@ for num_features in num_features_list:
     for num_rows in num_rows_list:
         num_cols = num_rows #keep it square grid for  now
 
-        result_writers = []
-        for i, verifier_name in enumerate(verifier_list):
-            filename = "{}_states{}x{}_features{}.txt".format(verifier_name, num_rows, num_cols, num_features)
-            print("writing to", filename)
-            result_writers.append(open(exp_data_dir + filename,'w'))
-
-        for r_iter in range(num_trials):
+        
+        for r_iter in [161]:#range(num_trials):
             print("="*10, r_iter, "="*10)
             print("features", num_features, "num_rows", num_rows)
             ##For this test I want to verify that the ranking-based machine teaching is able to correctly verify whether an agent is value aligned or not.
@@ -185,9 +180,9 @@ for num_features in num_features_list:
                     verified = tester.is_agent_value_aligned(eval_policies[i], eval_Qvalues[i], eval_weights[i])
                     #print(verified)
                     if verified:
-                        if debug:
-                            print("not supposed to be true...")
-                            input()
+                        #if debug:
+                        print("False positive, verified not supposed to be true...")
+                        input()
                     if not verified:
                         correct += 1
                 #TODO: how do I keep track of accuracy??
@@ -196,9 +191,9 @@ for num_features in num_features_list:
                 print("Accuracy = ", 100.0*verifier_accuracy)
                 #input()
                 
-                result_writers[vindx].write("{},{},{}\n".format(correct, num_eval_policies, size_verification_test))
-        for writer in result_writers:
-            writer.close()
+                #result_writers[vindx].write("{},{},{}\n".format(correct, num_eval_policies, size_verification_test))
+        #for writer in result_writers:
+        #    writer.close()
 
     #teacher = machine_teaching.RankingTeacher(world, debug=False)
     #teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
