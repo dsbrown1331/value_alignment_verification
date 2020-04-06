@@ -704,3 +704,119 @@ class SCOT(StateActionRankingTeacher):
             #TODO: optimize by removing trajs if we decide to add to opt_demos
     
         return opt_demos
+
+
+
+class MdpFamilyTeacher(SCOT):
+    '''
+    Takes as input a family of MDPs (list of mdps)
+    calculates the AEC for each MDP and then runs LP to remove redundancies
+    then runs set cover using entire MDPs to cover the set of halfspaces
+    returns the approximately minimal set of MDPs to test/teach on
+
+    '''
+    
+    def __init__(self, mdp_family, precision, debug=False):
+        self.mdp_family = mdp_family
+        self.precision = precision
+        self.debug = debug
+        self.mdp_halfspaces = []
+        all_halfspaces = []
+        for i,mdp_world in enumerate(mdp_family):
+            print("\n",i)
+            if self.debug: print(mdp_world.features)
+            #get all halfspace constraints
+            mteacher = StateActionRankingTeacher(mdp_world, epsilon = precision, debug=debug)
+            halfspace_normals = mteacher.compute_halfspace_normals(use_suboptimal_rankings=True)
+            #accumulate halfspaces
+            halfspaces = mteacher.preprocess_halfspace_normals(halfspace_normals)
+            self.mdp_halfspaces.append(halfspaces)
+            if self.debug: print(halfspaces)
+            all_halfspaces.extend(halfspaces)
+        all_halfspaces = np.array(all_halfspaces)
+        print("all")
+        print(all_halfspaces)
+        #remove redundancies
+        family_halfspaces = mteacher.preprocess_halfspace_normals(all_halfspaces)
+        self.family_halfspaces = np.array(family_halfspaces)
+        print(family_halfspaces)
+
+
+    def get_machine_teaching_mdps(self):
+        
+        constraint_set = self.family_halfspaces
+        candidate_mdps = self.mdp_family
+        candidate_halfspaces = self.mdp_halfspaces
+        #create boolean bookkeeping to see what has been covered in the set
+        covered = [False for _ in constraint_set]
+        
+        #for each candidate demonstration trajectory check how many uncovered set elements it covers and find one with max added covers
+        total_covered = 0
+        opt_mdps = []
+        while total_covered < len(constraint_set):
+            if self.debug: print("set cover iteration")
+            constraints_to_add = None
+            best_mdp = None
+            max_count = 0
+            for i, mdp_env in enumerate(candidate_mdps):
+                # if self.debug:
+                #     print("-"*20) 
+                #     print("MDP", i)
+
+                #     V = mdp.value_iteration(mdp_env, epsilon=self.precision)
+                #     Qopt = mdp.compute_q_values(mdp_env, V=V, eps=self.precision)
+                #     opt_policy = mdp.find_optimal_policy(mdp_env, Q = Qopt, epsilon=self.precision)
+                #     print("rewards")
+                #     mdp_env.print_rewards()
+                #     print("value function")
+
+                #     mdp_env.print_map(V)
+                #     print("mdp features")
+                #     utils.display_onehot_state_features(mdp_env)
+
+                #     print("optimal policy")
+                #     mdp_env.print_map(mdp_env.to_arrows(opt_policy))
+
+                #     print("halfspace")
+                #     print(candidate_halfspaces[i])
+                #get the halfspaces induced by an optimal policy in this MDP
+                constraints_new = candidate_halfspaces[i]
+ 
+                count = self.count_new_covers(constraints_new, constraint_set, covered)
+                #if self.debug: print("covered", count)
+                if count > max_count:
+                    max_count = count
+                    constraints_to_add = constraints_new
+                    best_mdp = mdp_env
+                    if self.debug:
+                        print()
+                        print("best mdp so far")
+                        print("-"*20) 
+                        print("MDP", i)
+
+                        V = mdp.value_iteration(mdp_env, epsilon=self.precision)
+                        Qopt = mdp.compute_q_values(mdp_env, V=V, eps=self.precision)
+                        opt_policy = mdp.find_optimal_policy(mdp_env, Q = Qopt, epsilon=self.precision)
+                        print("rewards")
+                        mdp_env.print_rewards()
+                        print("value function")
+
+                        mdp_env.print_map(V)
+                        print("mdp features")
+                        utils.display_onehot_state_features(mdp_env)
+
+                        print("optimal policy")
+                        mdp_env.print_map(mdp_env.to_arrows(opt_policy))
+
+                        print("halfspace")
+                        print(constraints_to_add)
+
+                        print("covered", count)
+
+            #update covered flags and add best_traj to demo`
+            opt_mdps.append(best_mdp)
+            covered = self.update_covered_constraints(constraints_to_add, constraint_set, covered)
+            total_covered += max_count
+            #TODO: optimize by removing trajs if we decide to add to opt_demos
+    
+        return opt_mdps

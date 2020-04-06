@@ -5,11 +5,11 @@ from numpy import genfromtxt
 num_rows_list = [4,8,16]
 num_cols_list = [4,8,16]
 num_features_list = [2,3,4,5,6,7,8]
-verifier_list = ["ranking-halfspace", "state-optimal-action-ranker","state-value-critical-0.5","state-value-critical-0.1"]
-name_map = {"ranking-halfspace":"AEC-w", "state-optimal-action-ranker":"AEC-AP","state-value-critical-0.5":"CS-0.5","state-value-critical-0.1":"CS-0.1"}
+verifier_list = ["ranking-halfspace", "scot", "optimal_action", "state-value-critical-0.1"]
+name_map = {"scot":"SCOT-traj", "optimal_action_allquestions":"AEC-OAP-all", "optimal_action":"AEC-OAP", "ranking-halfspace":"AEC-w", "state-optimal-action-ranker":"AEC-AP","state-value-critical-0.5":"CS-0.5","state-value-critical-0.1":"CS-0.1"}
 exp_data_dir = "./experiment_data/"
 
-color_lines = ['b^-', 'gs--', 'ro-.', 'kx:']
+color_lines = ['b^-', 'gs--', 'ro-.', 'kx:','cd-.','y+--','m^:']
 
 
 ##first let's plot the number of states along the x-axis and accuracy and test size on y-axis for the different methods
@@ -73,10 +73,10 @@ for num_features in num_features_list:
     plt.tight_layout()
     plt.savefig('./data_analysis/figs/basic_features{}_queries.png'.format(num_features))
 
-#plt.show()
+    #plt.show()
 
 
-verifier_list = ["ranking-halfspace","state-optimal-action-ranker",  "state-value-critical-0.5","state-value-critical-0.1"]
+verifier_list = ["ranking-halfspace", "scot", "optimal_action", "state-value-critical-0.1"]
 
 num_features_list = [2,3,4,5,6,7,8]
 
@@ -101,7 +101,10 @@ for num_rows in [4,8,16]:
             test_sizes = my_data[:,2]
             ave_accuracy = np.mean(num_correct / num_tested)
             all_accuracies[verifier_name].append(ave_accuracy)
-            all_test_sizes[verifier_name].append(np.mean(test_sizes))
+            if verifier_name == "ranking-halfspace":
+                all_test_sizes[verifier_name].append(1)
+            else:
+                all_test_sizes[verifier_name].append(np.mean(test_sizes))
 
     print(all_accuracies)
     print(all_test_sizes)
@@ -137,4 +140,4 @@ for num_rows in [4,8,16]:
     plt.tight_layout()
     plt.savefig('./data_analysis/figs/basic_size{}_queries.png'.format(num_rows))
 
-#plt.show()
+    #plt.show()

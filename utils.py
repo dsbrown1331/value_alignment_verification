@@ -43,7 +43,6 @@ def print_question(question, mdp_world):
 
 
 
-
 #______________________________________________________________________________
 # Functions on sequences of numbers
 # NOTE: these take the sequence argument first, like min and max,

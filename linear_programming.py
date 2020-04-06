@@ -1,4 +1,4 @@
-from cvxopt import matrix, solvers
+#from cvxopt import matrix, solvers
 import numpy as np
 
 from scipy.optimize import linprog
@@ -15,50 +15,50 @@ def toy_lp_scipy():
     input()
 
 
-def toy_lp_numpy():
-    #solves min_x c^T x subject to Ax <= b
-    A = np.array([[-1., -1.]])
-    b = np.zeros(1)#np.array([ 1.0, -2.0, 0.0, 4.0 ])
-    c = np.array([ 1.0, 2.0 ])
-    A = matrix(A)  #note that these are columns!! Not rows!
-    b = matrix(b)
-    c = matrix(c)
-    print(c.size)
-    print(A.size)
-    print(b.size)
+# def toy_lp_numpy():
+#     #solves min_x c^T x subject to Ax <= b
+#     A = np.array([[-1., -1.]])
+#     b = np.zeros(1)#np.array([ 1.0, -2.0, 0.0, 4.0 ])
+#     c = np.array([ 1.0, 2.0 ])
+#     A = matrix(A)  #note that these are columns!! Not rows!
+#     b = matrix(b)
+#     c = matrix(c)
+#     print(c.size)
+#     print(A.size)
+#     print(b.size)
     
-    sol=solvers.lp(c,A,b)
-    print(sol['x'])
-    print(sol.keys())
+#     sol=solvers.lp(c,A,b)
+#     print(sol['x'])
+#     print(sol.keys())
 
-def example_lp_numpy():
-    #solves min_x c^T x subject to Ax <= b
-    A = np.transpose(np.array([ [-1.0, -1.0, 0.0, 1.0], [1.0, -1.0, -1.0, -2.0] ]))
-    b = np.zeros(4)#np.array([ 1.0, -2.0, 0.0, 4.0 ])
-    c = np.array([ 2.0, 1.0 ])
-    A = matrix(A)  #note that these are columns!! Not rows!
-    b = matrix(b)
-    c = matrix(c)
-    print(c.size)
-    print(A.size)
-    print(b.size)
+# def example_lp_numpy():
+#     #solves min_x c^T x subject to Ax <= b
+#     A = np.transpose(np.array([ [-1.0, -1.0, 0.0, 1.0], [1.0, -1.0, -1.0, -2.0] ]))
+#     b = np.zeros(4)#np.array([ 1.0, -2.0, 0.0, 4.0 ])
+#     c = np.array([ 2.0, 1.0 ])
+#     A = matrix(A)  #note that these are columns!! Not rows!
+#     b = matrix(b)
+#     c = matrix(c)
+#     print(c.size)
+#     print(A.size)
+#     print(b.size)
     
-    sol=solvers.lp(c,A,b)
-    print(sol['x'])
-    print(sol.keys())
+#     sol=solvers.lp(c,A,b)
+#     print(sol['x'])
+#     print(sol.keys())
 
-def example_lp():
-    #solves min_x c^T x subject to Ax <= b
-    A = matrix([ [-1.0, -1.0, 0.0, 1.0], [1.0, -1.0, -1.0, -2.0] ])  #note that these are columns!! Not rows!
-    b = matrix([ 1.0, -2.0, 0.0, 4.0 ])
-    c = matrix([ 2.0, 1.0 ])
-    print(c.size)
-    print(A.size)
-    print(b.size)
+# def example_lp():
+#     #solves min_x c^T x subject to Ax <= b
+#     A = matrix([ [-1.0, -1.0, 0.0, 1.0], [1.0, -1.0, -1.0, -2.0] ])  #note that these are columns!! Not rows!
+#     b = matrix([ 1.0, -2.0, 0.0, 4.0 ])
+#     c = matrix([ 2.0, 1.0 ])
+#     print(c.size)
+#     print(A.size)
+#     print(b.size)
     
-    sol=solvers.lp(c,A,b)
-    print(sol['x'])
-    print(sol.keys())
+#     sol=solvers.lp(c,A,b)
+#     print(sol['x'])
+#     print(sol.keys())
 
 #TODO: at some point should probably use something better than scipy, do we have a license for ibm's solver?
 def is_redundant_constraint(h, H, epsilon=0.0001):
@@ -88,29 +88,29 @@ def is_redundant_constraint(h, H, epsilon=0.0001):
         return True
 
 
-#buggy, doesn't seem to work due to weird rank constraint on constraints.
-#I wonder if I used simplex if this would work better?
-def is_redundant_constraint_cvxopt(h, H, epsilon=0.0001):
-    #we have a constraint c^w >= 0 we want to see if we can minimize c^T w and get it to go below 0
-    # if not then this constraint is satisfied by the constraints in H, if we can, then we need to add c back into H 
-    #Thus, we want to minimize c^T w subject to Hw >= 0
-    #First we need to change this into the form min c^T x subject to Ax <= b
-    #Our problem is equivalent to min c^T w subject to  -H w <= 0
-    m,_ = H.shape
-    #H = np.transpose(H)  #get it into correct format
+# #buggy, doesn't seem to work due to weird rank constraint on constraints.
+# #I wonder if I used simplex if this would work better?
+# def is_redundant_constraint_cvxopt(h, H, epsilon=0.0001):
+#     #we have a constraint c^w >= 0 we want to see if we can minimize c^T w and get it to go below 0
+#     # if not then this constraint is satisfied by the constraints in H, if we can, then we need to add c back into H 
+#     #Thus, we want to minimize c^T w subject to Hw >= 0
+#     #First we need to change this into the form min c^T x subject to Ax <= b
+#     #Our problem is equivalent to min c^T w subject to  -H w <= 0
+#     m,_ = H.shape
+#     #H = np.transpose(H)  #get it into correct format
 
     
-    c = matrix(h)
-    G = matrix(-H)
-    b = matrix(np.zeros(m))
-    solvers.options['show_progress'] = False #comment this to see solver logging messages and progress
-    sol = solvers.lp(c,G,b)
-    if sol['status'] != "optimal": #if infeasible then constraint is needed to keep c^T w >=0
-        return False
-    elif sol['primal objective'] < -epsilon: #if less than zero then constraint is needed to keep c^T w >=0
-        #Not sure if we need this case, but just to be safe...
-        return False
-    else: #redundant since without constraint c^T w >=0
+#     c = matrix(h)
+#     G = matrix(-H)
+#     b = matrix(np.zeros(m))
+#     solvers.options['show_progress'] = False #comment this to see solver logging messages and progress
+#     sol = solvers.lp(c,G,b)
+#     if sol['status'] != "optimal": #if infeasible then constraint is needed to keep c^T w >=0
+#         return False
+#     elif sol['primal objective'] < -epsilon: #if less than zero then constraint is needed to keep c^T w >=0
+#         #Not sure if we need this case, but just to be safe...
+#         return False
+#     else: #redundant since without constraint c^T w >=0
         return True
     
 def remove_redundant_constraints(halfspaces, epsilon = 0.0001):

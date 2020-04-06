@@ -31,7 +31,8 @@ precision = 0.00001
 num_rows_list = [4,8,16]
 num_cols_list = [4,8,16]
 num_features_list = [2,3,4,5,6,7,8]
-verifier_list = ["scot", "optimal_action_allquestions", "optimal_action"]#,"state-optimal-action-ranker","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
+#verifier_list = ["scot", "optimal_action","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
+verifier_list = ["state-value-critical-0.7","state-value-critical-0.2","state-value-critical-0.01"]
 exp_data_dir = "./experiment_data/"
 
 
@@ -126,18 +127,10 @@ for num_features in num_features_list:
                 tester = None
                 size_verification_test = None
 
-                if verifier_name == "state-value-critical-1.0":
-                    critical_value_thresh = 1.0
+                if "state-value-critical-" in verifier_name:
+                    critical_value_thresh = float(verifier_name[len("state-value-critical-"):])
+                    #print("critical value", critical_value_thresh)
                     tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh, precision=precision)
-                    
-                elif verifier_name == "state-value-critical-0.5":
-                    critical_value_thresh = 0.5
-                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh, precision=precision)
- 
-                elif verifier_name == "state-value-critical-0.1":
-                    critical_value_thresh = 0.1
-                    tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh, precision=precision)
-
                 elif verifier_name == "ranking-halfspace":
                     tester = vav.HalfspaceVerificationTester(true_world, debug = debug, precision=precision)
 
