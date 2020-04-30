@@ -118,7 +118,7 @@ def remove_redundant_constraints(halfspaces, epsilon = 0.0001):
 
        Parameters
        -----------
-       halfspaces : list of halfspace normal vectors
+       halfspaces : list of halfspace normal vectors such that np.dot(halfspaces[i], w) >= 0 for all i
 
        epsilon : numerical precision for determining if redundant via LP solution 
 
@@ -163,7 +163,8 @@ def remove_redundant_constraints(halfspaces, epsilon = 0.0001):
 
 if __name__=="__main__":
     
-    #example halfspace constraints in 2-d:
+    #example halfspace constraints in 2-d: all halfspace constraints are assumed to be the normal vectors such that 
+    #x^T halfspace[i] >= 0 for all i
     halfspaces = np.array([[-1.,  0.],
                 [ 0.09950372, -0.99503719],
                 [ 0.8752954,  -0.48358862],
