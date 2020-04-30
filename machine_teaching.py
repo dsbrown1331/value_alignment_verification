@@ -723,23 +723,53 @@ class MdpFamilyTeacher(SCOT):
         self.mdp_halfspaces = []
         all_halfspaces = []
         for i,mdp_world in enumerate(mdp_family):
-            print("\n",i)
+            #print("\n",i)
             if self.debug: print(mdp_world.features)
             #get all halfspace constraints
             mteacher = StateActionRankingTeacher(mdp_world, epsilon = precision, debug=debug)
-            halfspace_normals = mteacher.compute_halfspace_normals(use_suboptimal_rankings=True)
+            halfspace_normals = mteacher.compute_halfspace_normals(use_suboptimal_rankings=False)
             #accumulate halfspaces
             halfspaces = mteacher.preprocess_halfspace_normals(halfspace_normals)
             self.mdp_halfspaces.append(halfspaces)
             if self.debug: print(halfspaces)
             all_halfspaces.extend(halfspaces)
         all_halfspaces = np.array(all_halfspaces)
-        print("all")
+        print("all before processing")
         print(all_halfspaces)
-        #remove redundancies
-        family_halfspaces = mteacher.preprocess_halfspace_normals(all_halfspaces)
-        self.family_halfspaces = np.array(family_halfspaces)
-        print(family_halfspaces)
+        #remove redundancies except for lp
+         #preprocess by removing duplicates before running LP
+        #use cosine_dist for similarity
+        preprocessed_normals = []
+        for n in all_halfspaces:
+            already_in_list = False
+            #search through preprocessed_normals for close match
+            for pn in preprocessed_normals:
+                if distance.cosine(n, pn) < self.precision:
+                    already_in_list = True
+                    break
+            if not already_in_list:
+                #add to list
+                preprocessed_normals.append(n)
+        self.all_halfspaces = np.array(preprocessed_normals)
+        #run linear programming to remove redundancies
+        if len(preprocessed_normals) > 2:
+            min_constraints = linear_programming.remove_redundant_constraints(preprocessed_normals)
+        else:
+            #don't need to run LP since only two halfspaces so neither will be redundant
+            min_constraints = preprocessed_normals
+
+        #family_halfspaces = mteacher.preprocess_halfspace_normals(preprocessed_normals)
+        self.family_halfspaces = np.array(min_constraints)
+        print(self.family_halfspaces)
+        #input()
+
+    def get_halfspaces_for_plotting(self):
+        minimal_set = []
+        for i,h in enumerate(self.all_halfspaces):
+            for hj in self.family_halfspaces:
+                if distance.cosine(h, hj) < self.precision:
+                    minimal_set.append(i)
+        return self.all_halfspaces, minimal_set
 
 
     def get_machine_teaching_mdps(self):

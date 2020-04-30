@@ -9,7 +9,7 @@ import alignment_heuristics as ah
 import random
 import sys
 import gridNxNexhaustive as mdp_gen
-import data_analysis.mdp_family_teaching.twoFeatureFeasibleRegionPlot
+import data_analysis.mdp_family_teaching.twoFeatureFeasibleRegionPlot as plot_aec
 import data_analysis.plot_grid as mdp_plot
 import matplotlib.pyplot as plt
 
@@ -21,8 +21,10 @@ def random_weights(num_features):
 
 init_seed = 1234
 
+folder_to_save = "./data_analysis/figs/threeXthree/"
+
 num_features = 2
-grid_length = 2
+grid_length = 3
 num_cols = grid_length
 num_rows = grid_length
 initials = [(i,j) for i in range(num_rows) for j in range(num_cols)]
@@ -69,17 +71,27 @@ for i,mdp_env in enumerate(mdp_family):
     all_opts.append(opt_policy)
     all_features.append(mdp_env.features)
     #input()
-filename = "./data_analysis/figs/twoXtwo/firstthree.png"
+filename = folder_to_save + "firstthree.png"
 mdp_plot.plot_optimal_policy_vav_grid(all_opts[:3], all_features[:3], 1, 3, filename=filename)
-filename = "./data_analysis/figs/twoXtwo/lastthree.png"
+filename = folder_to_save + "lastthree.png"
 mdp_plot.plot_optimal_policy_vav_grid(all_opts[-3:], all_features[-3:], 1, 3, filename=filename)
 #plt.show()
 
 family_teacher = machine_teaching.MdpFamilyTeacher(mdp_family, precision, debug)
+halfspaces, non_redundant_indices = family_teacher.get_halfspaces_for_plotting()
+print(halfspaces)
+print(non_redundant_indices)
+#input()
+
+filename = folder_to_save + "family_aec.png"
+plot_aec.plot_feasible_region(halfspaces, non_redundant_indices, filename, False)
+
+
 mdp_set_cover = family_teacher.get_machine_teaching_mdps()
 
+
 print("SOLUTION:::::")
-for true_world in mdp_set_cover:
+for i,true_world in enumerate(mdp_set_cover):
     print()
     V = mdp.value_iteration(true_world, epsilon=precision)
     Qopt = mdp.compute_q_values(true_world, V=V, eps=precision)
@@ -98,6 +110,20 @@ for true_world in mdp_set_cover:
 
     print("optimal policy")
     true_world.print_map(true_world.to_arrows(opt_policy))
+
+    filename = folder_to_save + "setcover" + str(i) + ".png"
+    mdp_plot.plot_optimal_policy_vav(opt_policy, true_world.features, filename=filename)
+    #plot the AEC for each solution
+    mdp_teacher = machine_teaching.MdpFamilyTeacher([true_world], precision, debug)
+    halfspaces, non_redundant_indices = mdp_teacher.get_halfspaces_for_plotting()
+    filename = folder_to_save + "mdp_aec" + str(i) + ".png"
+    plot_aec.plot_feasible_region(halfspaces, non_redundant_indices, filename, False)
+
+#plot the AEC for the intersection of the solutions
+mdp_teacher = machine_teaching.MdpFamilyTeacher(mdp_set_cover, precision, debug)
+halfspaces, non_redundant_indices = mdp_teacher.get_halfspaces_for_plotting()
+filename = folder_to_save + "mdp_aec_setcover.png"
+plot_aec.plot_feasible_region(halfspaces, non_redundant_indices, filename, False)
 
     # #run value alignment verification test gen to get halfspaces
     # tester = vav.HalfspaceVerificationTester(true_world, debug = False, precision=precision)

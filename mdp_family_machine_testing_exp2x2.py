@@ -9,7 +9,7 @@ import alignment_heuristics as ah
 import random
 import sys
 import gridNxNexhaustive as mdp_gen
-import data_analysis.mdp_family_teaching.twoFeatureFeasibleRegionPlot
+import data_analysis.mdp_family_teaching.twoFeatureFeasibleRegionPlot as plot_aec
 import data_analysis.plot_grid as mdp_plot
 import matplotlib.pyplot as plt
 
@@ -76,10 +76,20 @@ mdp_plot.plot_optimal_policy_vav_grid(all_opts[-3:], all_features[-3:], 1, 3, fi
 #plt.show()
 
 family_teacher = machine_teaching.MdpFamilyTeacher(mdp_family, precision, debug)
+halfspaces, non_redundant_indices = family_teacher.get_halfspaces_for_plotting()
+print(halfspaces)
+print(non_redundant_indices)
+#input()
+
+filename = "./data_analysis/figs/twoXtwo/family_aec.png"
+plot_aec.plot_feasible_region(halfspaces, non_redundant_indices, filename)
+
+
 mdp_set_cover = family_teacher.get_machine_teaching_mdps()
 
+
 print("SOLUTION:::::")
-for true_world in mdp_set_cover:
+for i,true_world in enumerate(mdp_set_cover):
     print()
     V = mdp.value_iteration(true_world, epsilon=precision)
     Qopt = mdp.compute_q_values(true_world, V=V, eps=precision)
@@ -98,6 +108,20 @@ for true_world in mdp_set_cover:
 
     print("optimal policy")
     true_world.print_map(true_world.to_arrows(opt_policy))
+
+    filename = "./data_analysis/figs/twoXtwo/setcover" + str(i) + ".png"
+    mdp_plot.plot_optimal_policy_vav(opt_policy, true_world.features, filename=filename)
+    #plot the AEC for each solution
+    mdp_teacher = machine_teaching.MdpFamilyTeacher([true_world], precision, debug)
+    halfspaces, non_redundant_indices = mdp_teacher.get_halfspaces_for_plotting()
+    filename = "./data_analysis/figs/twoXtwo/mdp_aec" + str(i) + ".png"
+    plot_aec.plot_feasible_region(halfspaces, non_redundant_indices, filename)
+
+#plot the AEC for the intersection of the solutions
+mdp_teacher = machine_teaching.MdpFamilyTeacher(mdp_set_cover, precision, debug)
+halfspaces, non_redundant_indices = mdp_teacher.get_halfspaces_for_plotting()
+filename = "./data_analysis/figs/twoXtwo/mdp_aec_setcover.png"
+plot_aec.plot_feasible_region(halfspaces, non_redundant_indices, filename)
 
     # #run value alignment verification test gen to get halfspaces
     # tester = vav.HalfspaceVerificationTester(true_world, debug = False, precision=precision)

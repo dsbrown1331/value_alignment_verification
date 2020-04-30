@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors
+import sys
 
 
 def plot_dashed_arrow(state, width, ax, direction):
@@ -94,6 +95,7 @@ def plot_optimal_policy(pi, feature_mat):
 
     ax = plt.axes() 
     count = 0
+    print(pi)
     rows,cols = len(pi), len(pi[0])
     for line in pi:
         for el in line:
@@ -101,48 +103,225 @@ def plot_optimal_policy(pi, feature_mat):
             # could be a stochastic policy with more than one optimal action
             for char in el:
                 print(char)
-                if char is "^":
+                if char is "^" or char == (-1,0):
                     plot_arrow(count, cols, ax, "up")
-                elif char is "v":
+                elif char is "v" or char == (1,0): 
                     plot_arrow(count, cols, ax, "down")
-                elif char is ">":
+                elif char is ">" or char == (0,1):
                     plot_arrow(count, cols, ax, "right")
-                elif char is "<":
+                elif char is "<" or char == (0,-1):
                     plot_arrow(count, cols, ax, "left")
                 elif char is ".":
                     plot_dot(count, cols, ax)
                 elif el is "w":
                     #wall
                     pass
+                else:
+                    print("error in policy format")
+                    sys.exit()
             count += 1
 
     
     mat = [[0 if fvec is None else fvec.index(1)+1 for fvec in row] for row in feature_mat]
     #convert feature_mat into colors
     #heatmap =  plt.imshow(mat, cmap="Reds", interpolation='none', aspect='equal')
-    cmap = colors.ListedColormap(['black','white','tab:blue','tab:red','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan'])
-    plt.imshow(mat, cmap=cmap, interpolation='none', aspect='equal')
-    # Add the grid
+    cmap = colors.ListedColormap(['black','white','tab:red', 'tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan'])
+    im = plt.imshow(mat, cmap=cmap, interpolation='none', aspect='equal')
+
     ax = plt.gca()
-    # Minor ticks
+
     ax.set_xticks(np.arange(-.5, cols, 1), minor=True);
     ax.set_yticks(np.arange(-.5, rows, 1), minor=True);
-    ax.grid(which='minor', axis='both', linestyle='-', linewidth=5, color='k')
-    #remove ticks
-    plt.tick_params(
-        axis='both',          # changes apply to the x-axis
-        which='both',      # both major and minor ticks are affected
-        bottom='off',      # ticks along the bottom edge are off
-        top='off',         # ticks along the top edge are off
-        left='off',
-        right='off',
-        labelbottom='off',
-        labelleft='off') # labels along the bottom edge are off
-
+    #ax.grid(which='minor', axis='both', linestyle='-', linewidth=5, color='k')
+    # Gridlines based on minor ticks
+    ax.grid(which='minor', color='k', linestyle='-', linewidth=5)
+    ax.xaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_locator(plt.NullLocator())
+    ax.xaxis.set_major_locator(plt.NullLocator())
     #cbar = plt.colorbar(heatmap)
     #cbar.ax.tick_params(labelsize=20) 
     plt.show()
+
+def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False):
+    #takes a dictionary of policy optimal actions
+    #takes a 2d array of feature vectors
+    plt.figure()
+
+    ax = plt.axes() 
+    count = 0
+    print(pi)
+    rows,cols = len(feature_mat), len(feature_mat[0])
+    for r in range(rows):
+        for c in range(cols):
+            opt_actions = pi[(r,c)]
+            for a in opt_actions:
+                print("optimal action", a)
+                # could be a stochastic policy with more than one optimal action
+                if a is None:
+                    plot_dot(count, cols, ax)
+                else:
+                    if a == (-1,0):
+                        plot_arrow(count, cols, ax, "up")
+                    elif a == (1,0): 
+                        plot_arrow(count, cols, ax, "down")
+                    elif a == (0,1):
+                        plot_arrow(count, cols, ax, "right")
+                    elif a == (0,-1):
+                        plot_arrow(count, cols, ax, "left")
+                    elif a is None:
+                        plot_dot(count, cols, ax)
+                    elif a is "w":
+                        #wall
+                        pass
+                    else:
+                        print("error in policy format")
+                        sys.exit()
+            count += 1
+
+    print(feature_mat)
     
+    #use for wall states
+    #if walls:
+    mat = [[0 if fvec is None else fvec.index(1)+1 for fvec in row] for row in feature_mat]
+    
+    #mat =[[0,0],[2,2]]
+    feature_set = set()
+    for mrow in mat:
+        for m in mrow:
+            feature_set.add(m)
+    num_features = len(feature_set)
+    print(mat)
+    all_colors = ['black','white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan']
+    colors_to_use = []
+    for f in range(9):#hard coded to only have 9 features right now
+        if f in feature_set:
+            colors_to_use.append(all_colors[f])
+    cmap = colors.ListedColormap(colors_to_use)
+    # else:
+    #     mat = [[fvec.index(1) for fvec in row] for row in feature_mat]
+    #     cmap = colors.ListedColormap(['white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan'])
+    
+    #input()
+    
+    #convert feature_mat into colors
+    #heatmap =  plt.imshow(mat, cmap="Reds", interpolation='none', aspect='equal')
+    
+    im = plt.imshow(mat, cmap=cmap, interpolation='none', aspect='equal')
+
+    ax = plt.gca()
+
+    ax.set_xticks(np.arange(-.5, cols, 1), minor=True);
+    ax.set_yticks(np.arange(-.5, rows, 1), minor=True);
+    #ax.grid(which='minor', axis='both', linestyle='-', linewidth=5, color='k')
+    # Gridlines based on minor ticks
+    ax.grid(which='minor', color='k', linestyle='-', linewidth=5)
+    ax.xaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_locator(plt.NullLocator())
+    ax.xaxis.set_major_locator(plt.NullLocator())
+    #cbar = plt.colorbar(heatmap)
+    #cbar.ax.tick_params(labelsize=20) 
+    plt.tight_layout()
+    if filename:
+        plt.savefig(filename)
+    else:
+        plt.show()
+
+
+def plot_optimal_policy_vav_grid(pis, feature_mats, g_rows, g_cols, walls=False, filename=False):
+    #size is tuple for rows / cols of
+    #takes a dictionary of policy optimal actions
+    #takes a 2d array of feature vectors
+    fig, axs = plt.subplots(g_rows, g_cols)
+    cnt = 0
+    for ax in axs:#r in range(g_rows):
+        #for c in range(g_cols):
+            #print(r,c)
+            #ax = axs[r,c]
+            #ax.set_title('Axis [0,0]')
+            pi = pis[cnt]
+            feature_mat = feature_mats[cnt]
+            cnt += 1
+            count = 0
+            print(pi)
+            rows,cols = len(feature_mat), len(feature_mat[0])
+            for r in range(rows):
+                for c in range(cols):
+                    opt_actions = pi[(r,c)]
+                    for a in opt_actions:
+                        print("optimal action", a)
+                        # could be a stochastic policy with more than one optimal action
+                        if a is None:
+                            plot_dot(count, cols, ax)
+                        else:
+                            if a == (-1,0):
+                                plot_arrow(count, cols, ax, "up")
+                            elif a == (1,0): 
+                                plot_arrow(count, cols, ax, "down")
+                            elif a == (0,1):
+                                plot_arrow(count, cols, ax, "right")
+                            elif a == (0,-1):
+                                plot_arrow(count, cols, ax, "left")
+                            elif a is None:
+                                plot_dot(count, cols, ax)
+                            elif a is "w":
+                                #wall
+                                pass
+                            else:
+                                print("error in policy format")
+                                sys.exit()
+                    count += 1
+
+            print(feature_mat)
+            
+            #use for wall states
+            #if walls:
+            mat = [[0 if fvec is None else fvec.index(1)+1 for fvec in row] for row in feature_mat]
+            
+            #mat =[[0,0],[2,2]]
+            feature_set = set()
+            for mrow in mat:
+                for m in mrow:
+                    feature_set.add(m)
+            num_features = len(feature_set)
+            print(mat)
+            all_colors = ['black','white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan']
+            colors_to_use = []
+            for f in range(9):#hard coded to only have 9 features right now
+                if f in feature_set:
+                    colors_to_use.append(all_colors[f])
+            cmap = colors.ListedColormap(colors_to_use)
+            # else:
+            #     mat = [[fvec.index(1) for fvec in row] for row in feature_mat]
+            #     cmap = colors.ListedColormap(['white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan'])
+            
+            #input()
+            
+            #convert feature_mat into colors
+            #heatmap =  plt.imshow(mat, cmap="Reds", interpolation='none', aspect='equal')
+            
+            ax.imshow(mat, cmap=cmap, interpolation='none', aspect='equal')
+
+            #ax = plt.gca()
+
+            ax.set_xticks(np.arange(-.5, cols, 1), minor=True);
+            ax.set_yticks(np.arange(-.5, rows, 1), minor=True);
+            #ax.grid(which='minor', axis='both', linestyle='-', linewidth=5, color='k')
+            # Gridlines based on minor ticks
+            ax.grid(which='minor', color='k', linestyle='-', linewidth=5)
+            ax.xaxis.set_major_formatter(plt.NullFormatter())
+            ax.yaxis.set_major_formatter(plt.NullFormatter())
+            ax.yaxis.set_major_locator(plt.NullLocator())
+            ax.xaxis.set_major_locator(plt.NullLocator())
+            #cbar = plt.colorbar(heatmap)
+            #cbar.ax.tick_params(labelsize=20) 
+    plt.tight_layout()
+    if filename:
+        plt.savefig(filename)
+    else:
+        plt.show()
+
     
 def plot_test_query(state, better_action, worse_action, feature_mat, equal_pref = False):
 

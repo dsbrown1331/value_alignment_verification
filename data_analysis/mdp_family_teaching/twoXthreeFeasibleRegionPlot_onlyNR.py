@@ -56,8 +56,8 @@ for i in non_redundants:
 #plt.fill_between([-1, 0],[-1, 0],[-1, -1], facecolor='none', interpolate=True, hatch='+')
 ##uncomment for full policy feasible
 h = halfspaces[0]
-plt.fill_between([h[1]/h[0], 0],[-1, 0],[-1, -1], facecolor='none', interpolate=True, hatch='+')
-plt.fill_between([h[1]/h[0], 0],[-1, 0],[-1, -1], facecolor=one_color, interpolate=True, alpha=fillamount)
+plt.fill_between([h[1]/h[0], 0],[-1, 0],[-1, -1], facecolor=one_color, interpolate=True, hatch='+', alpha=fillamount)
+#plt.fill_between([h[1]/h[0], 0],[-1, 0],[-1, -1], facecolor=one_color, interpolate=True, alpha=fillamount)
 
 plt.axis([-1,1,-1,1])
 plt.xlabel("$w_0$", fontsize=50)
