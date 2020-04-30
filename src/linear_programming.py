@@ -4,15 +4,15 @@ import numpy as np
 from scipy.optimize import linprog
 import sys
 
-def toy_lp_scipy():
-    A = np.array([[-1., -1.]])
-    b = np.zeros(1)#np.array([ 1.0, -2.0, 0.0, 4.0 ])
-    c = np.array([ 1.0, 1.0 ])
-    sol = linprog(c, A_ub=A, b_ub = b, bounds=(-1,1) )
-    print(sol['fun'])
-    print(sol['status'])
-    #TODO: I wonder if simplex is better than interior point if things lie on a halfplane?
-    input()
+# def toy_lp_scipy():
+#     A = np.array([[-1., -1.]])
+#     b = np.zeros(1)#np.array([ 1.0, -2.0, 0.0, 4.0 ])
+#     c = np.array([ 1.0, 1.0 ])
+#     sol = linprog(c, A_ub=A, b_ub = b, bounds=(-1,1) )
+#     print(sol['fun'])
+#     print(sol['status'])
+#     #TODO: I wonder if simplex is better than interior point if things lie on a halfplane?
+#     input()
 
 
 # def toy_lp_numpy():
@@ -60,7 +60,7 @@ def toy_lp_scipy():
 #     print(sol['x'])
 #     print(sol.keys())
 
-#TODO: at some point should probably use something better than scipy, do we have a license for ibm's solver?
+#TODO: at some point should probably use something better than scipy, do we have a license for ibm's cplex solver?
 def is_redundant_constraint(h, H, epsilon=0.0001):
     #we have a constraint c^w >= 0 we want to see if we can minimize c^T w and get it to go below 0
     # if not then this constraint is satisfied by the constraints in H, if we can, then we need to add c back into H 
@@ -114,14 +114,28 @@ def is_redundant_constraint(h, H, epsilon=0.0001):
         return True
     
 def remove_redundant_constraints(halfspaces, epsilon = 0.0001):
+    """Return a new array with all redundant halfspaces removed.
+
+       Parameters
+       -----------
+       halfspaces : list of halfspace normal vectors
+
+       epsilon : numerical precision for determining if redundant via LP solution 
+
+       Returns
+       -----------
+       list of non-redundant halfspaces 
+    """
     #for each row in halfspaces, check if it is redundant
-    num_vars = len(halfspaces[0]) #size of weight vector
+    #num_vars = len(halfspaces[0]) #size of weight vector
     non_redundant_halfspaces = []
     halfspaces_to_check = halfspaces
     for i,h in enumerate(halfspaces):
         #print("\nchecking", h)
         halfspaces_lp = [h for h in non_redundant_halfspaces] + [h for h in halfspaces_to_check[1:]]
         halfspaces_lp = np.array(halfspaces_lp)
+     
+        ##debuggin
         #print(halfspaces_lp)
         #print(np.linalg.matrix_rank(halfspaces_lp))
         #u, s, v = np.linalg.svd(halfspaces_lp)
@@ -148,9 +162,8 @@ def remove_redundant_constraints(halfspaces, epsilon = 0.0001):
 
 
 if __name__=="__main__":
-    toy_lp_scipy()
-    #example_lp_numpy()
-    #example_lp()
+    
+    #example halfspace constraints in 2-d:
     halfspaces = np.array([[-1.,  0.],
                 [ 0.09950372, -0.99503719],
                 [ 0.8752954,  -0.48358862],
@@ -158,18 +171,13 @@ if __name__=="__main__":
                 [ 0.95434967, -0.29869164],
                 [ 0.70710678, -0.70710678]])
 
+    #check if a particular constraint is redundant
     H = halfspaces[1:]
     c = halfspaces[0]  
-    #print(is_redundant_constraint(c,H))
+    print("is redundant", is_redundant_constraint(c,H))
+
+    #remove all redundant halfspace constraints
     minimal_halfspaces = remove_redundant_constraints(halfspaces)
     print("minimal halfspaces")
     for h in minimal_halfspaces:
         print(h)
-
-    #Interesting!! This is tigher than the actual BEC(\pi^*)! This is because I think it selects the top right > verus top right < and going left (or up)
-    # are better than going right so it gives a tighter BEC.
-
-    #I wonder if this is good or bad. Will an agent fully understand it's preferences enough to know which of two suboptimal choices is worse?
-
-    #If we don't want this behavior we can instead just look at opt versus non-opt and this should get us back to the BEC exactly but with no boundary problems!
-    #I added an argument to machine teaching to do this.
