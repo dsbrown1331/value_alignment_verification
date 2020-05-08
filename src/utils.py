@@ -1,4 +1,88 @@
 import numpy as np
+import random
+
+def optimal_rollout_from_Qvals(start, horizon, Q, mdp_env, precision):
+    #generate a rollout starting at start of length horizon
+    rollout = []
+    #first get the stochastic optimal policy
+
+    #rollout for H steps or until a terminal is reached
+    curr_state = start
+    #print('start',curr_state)
+    steps = 0
+    while curr_state not in mdp_env.terminals and steps < horizon:
+        #print('actions',policy[curr_state])
+        #select an action choice according to policy action probs
+        actions = mdp_env.actions(curr_state)
+        # print(actions)
+        # print(curr_state)
+        # for a in actions:
+        #     print(Q[curr_state,a])
+        opt_actions = argmax_list(actions, lambda a: Q[curr_state, a], precision)
+        a = random.choice(opt_actions)
+        # print(a)
+        rollout.append((curr_state, a))
+        #sample transition
+        action_transition_probs = []
+        next_states = []
+        for p,s2 in mdp_env.T(curr_state, a):
+            action_transition_probs.append(p)
+            next_states.append(s2)
+        # print("next states", next_states)
+        s_next = random.choices(next_states, weights = action_transition_probs)[0]
+        # print("next", s_next)
+        curr_state = s_next
+        steps += 1
+        #print('next state', curr_state)
+    if curr_state in mdp_env.terminals:
+        #append the terminal state
+        rollout.append((curr_state, None))  #no more actions available
+    return rollout
+
+
+def sa_optimal_rollout_from_Qvals(start, init_action, horizon, Q, mdp_env, precision):
+    #generate a rollout starting at start taking action a and then continuing for length horizon
+    rollout = []
+    #first get the stochastic optimal policy
+
+    #rollout for H steps or until a terminal is reached
+    curr_state = start
+    #print('start',curr_state)
+    steps = 0
+    while curr_state not in mdp_env.terminals and steps < horizon:
+        #print('actions',policy[curr_state])
+        if steps == 0:
+            #take action specified
+            a = init_action
+        else:
+            #select an action choice according to policy action probs
+            actions = mdp_env.actions(curr_state)
+            # print(actions)
+            # print(curr_state)
+            # for a in actions:
+            #     print(Q[curr_state,a])
+            opt_actions = argmax_list(actions, lambda a: Q[curr_state, a], precision)
+            a = random.choice(opt_actions)
+        # print(a)
+        rollout.append((curr_state, a))
+        #sample transition
+        action_transition_probs = []
+        next_states = []
+        for p,s2 in mdp_env.T(curr_state, a):
+            action_transition_probs.append(p)
+            next_states.append(s2)
+        # print("next states", next_states)
+        s_next = random.choices(next_states, weights = action_transition_probs)[0]
+        # print("next", s_next)
+        curr_state = s_next
+        steps += 1
+        #print('next state', curr_state)
+    if curr_state in mdp_env.terminals:
+        #append the terminal state
+        rollout.append((curr_state, None))  #no more actions available
+    return rollout
+
+
 
 def entropy(outcome_probs):
     entropy = 0.0
@@ -23,7 +107,20 @@ def display_onehot_state_features(mdp_world):
     mdp_world.print_2darray(state_features_2d)
 
 
-
+def print_traj(traj, mdp_world, print=True):
+    '''if print is False then it just returns a string'''
+    arrow = mdp_world.to_arrow #to make debugging actions human readable
+    traj_str = ""
+    for i, s_a in enumerate(traj):
+        s,a = s_a
+        if i < len(traj) - 1:
+            traj_str += "({}, {}), ".format(s, arrow(a))
+        else:
+            traj_str += "({}, {})".format(s, arrow(a))
+    if print:
+        print(traj_str)
+    else:
+        return traj_str
 
 
 

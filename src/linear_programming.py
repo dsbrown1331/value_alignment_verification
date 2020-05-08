@@ -67,6 +67,7 @@ def is_redundant_constraint(h, H, epsilon=0.0001):
     #Thus, we want to minimize c^T w subject to Hw >= 0
     #First we need to change this into the form min c^T x subject to Ax <= b
     #Our problem is equivalent to min c^T w subject to  -H w <= 0
+    H = np.array(H) #just to make sure
     m,_ = H.shape
     #H = np.transpose(H)  #get it into correct format
 
@@ -74,6 +75,7 @@ def is_redundant_constraint(h, H, epsilon=0.0001):
     #G = matrix(-H[:,non_zeros])
     b = np.zeros(m)
     sol = linprog(h, A_ub=-H, b_ub = b, bounds=(-1,1), method = 'revised simplex' )
+    # print(sol)
     if sol['status'] != 0:
         print("trying interior point method")
         sol = linprog(h, A_ub=-H, b_ub = b, bounds=(-1,1) )

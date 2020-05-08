@@ -33,14 +33,14 @@ num_eval_policies_tries = 50
 #scot params
 num_rollouts = 20
 #used for scot and traj comparisons
-rollout_length = 30  #should be less than  np.log(eps * (1-gamma))/np.log(gamma) to gurantee epsilong accuracy
+rollout_length = 300  #should be less than  np.log(eps * (1-gamma))/np.log(gamma) to gurantee epsilong accuracy
 
 
 debug = False
 precision = 0.00001
-num_rows_list = [4,8,16]
-num_cols_list = [4,8,16]
-num_features_list = [2,3,4,5,6,7,8]
+num_rows_list = [16]#[4,8,16]
+num_cols_list = [16]#[4,8,16]
+num_features_list = [4]#[2,3,4,5,6,7,8]
 #verifier_list = ["scot", "optimal_action","state-value-critical-1.0","state-value-critical-0.5","state-value-critical-0.1", "ranking-halfspace"]
 #verifier_list = ["state-value-critical-0.7","state-value-critical-0.2","state-value-critical-0.01"]
 verifier_list = ['trajectory_aec']
@@ -59,7 +59,7 @@ for num_features in num_features_list:
             result_writers.append(open(full_path,'w'))
             #input()
 
-        for r_iter in range(num_trials):
+        for r_iter in [26]:#range(num_trials):
             print("="*10, r_iter, "="*10)
             print("features", num_features, "num_rows", num_rows)
             ##For this test I want to verify that the ranking-based machine teaching is able to correctly verify whether an agent is value aligned or not.

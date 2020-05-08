@@ -1,7 +1,7 @@
 import numpy as np
-import mdp
+import src.mdp
 import random
-import machine_teaching
+import src.machine_teaching
 
 def debug_mdp(world):
     print("rewards")

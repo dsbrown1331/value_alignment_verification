@@ -1,8 +1,8 @@
-import machine_teaching
-import utils
+import src.machine_teaching as machine_teaching
+import src.utils as utils
 import numpy as np
-from alignment_interface import Verifier
-import mdp
+from src.alignment_interface import Verifier
+import src.mdp as mdp
 
 class SCOTVerificationTester(Verifier):
     """takes the machine teaching set of trajectories from SCOT and asks the agent being tested to fill in the actions it would take 
@@ -64,12 +64,13 @@ class HalfspaceVerificationTester(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
        by taking the agent's reward function and testing whether it is in the AEC(\pi^*)
     """
-    def __init__(self, mdp_world, precision, debug=False):
+    def __init__(self, mdp_world, precision, debug=False, use_suboptimal_rankings = False):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.TrajectoryRankingTeacher(mdp_world, debug=self.debug, epsilon=precision)
-
+        teacher = machine_teaching.StateActionRankingTeacher(mdp_world, debug=self.debug, epsilon=precision)
+        
+        #TODO: we don't need the tests, just the halfspaces, but we do need to know which are equality
         tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
         #for now let's just select the first question for each halfspace
@@ -79,9 +80,9 @@ class HalfspaceVerificationTester(Verifier):
         return 1 #just needs to ask for reward weights
 
     def is_agent_value_aligned(self,  agent_policy, agent_qvals, agent_reward_weights):
-
+        #Doesn't even need the tests! Just the halfspaces.
         #test each halfspace, need to check if equivalence test or strict preference test by looking at the question
-        for i, question in enumerate(self.test):
+        for i,question in enumerate(self.test):
             if self.debug:
                 print("Testing question:")
                 utils.print_question(question, self.mdp_world)
@@ -109,6 +110,73 @@ class HalfspaceVerificationTester(Verifier):
                 print("correct answer")
         #only return true if not incorrect answers have been given.  
         return True
+
+
+class TrajectoryRankingBasedTester(Verifier):
+    """takes an MDP and an agent and tests whether the agent has value alignment
+       assumes that tests are of the form of do you think trajectory a is better than or equally preferred to trajectory b?
+       Current implementation accesses agent's reward function under the hood to test this
+    """
+    def __init__(self, mdp_world, precision, horizon, debug=False, use_suboptimal_rankings = False):
+        self.mdp_world = mdp_world
+        self.precision = precision
+        self.debug = debug
+
+        #first get the AEC halfspaces
+        teacher = machine_teaching.TrajectoryRankingTeacher(mdp_world, precision=precision, horizon=horizon, debug=self.debug, )
+
+        #let's test if we can use trajectories to make the AEC redundant (this should always be possible when two features aren't equal reward and transitions are deterministic)
+        #test is a list of TrajPairs and halfspaces is a matrix of halfspace normals as rows
+        self.test, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings)
+
+        
+        
+
+    def get_size_verification_test(self):
+        return len(self.test)
+
+    def is_agent_value_aligned(self, policy, agent_q_values, reward_weights):
+
+        #Need to ask the agent what it would do in each setting. Just need the "agent" to asses the quality of the trajectories
+        #to make things simpler we can just dot the reward_weights with the question halfspace
+        for traj_pair in self.test:
+            if self.debug:
+                print("Testing question:")
+                print(traj_pair)
+            
+            if not traj_pair.equivalence:
+                dot_prod = np.dot(traj_pair.halfspace, reward_weights)
+                if self.debug:
+                    print("dot product should be positive")
+                    print("halfspace", traj_pair.halfspace)
+                    print("w", reward_weights)
+                    print("dot = ", dot_prod)
+
+                #check reward can correctly rank trajectories
+                #if better action q-value is not numerically significantly better, then fail the agent
+                if not dot_prod - self.precision > 0:
+                    if self.debug:
+                        print("wrong answer should be greater than zero by at least ", self.precision)
+                    return False
+            else:
+                #we have an equivalence
+                if self.debug:
+                    print("dot product should be zero")
+                    print("halfspace", traj_pair.halfspace)
+                    print("w", reward_weights)
+                    print("dot = ", dot_prod)
+
+                    #if agent q-values are not within numerical precision of each other, then fail the agent
+                    if not abs(dot_prod) < self.precision:
+                        if self.debug:
+                            print("wrong answer. dot product should be equal to zero")
+                        return False
+                
+            if self.debug:
+                print("correct answer")
+        return True
+
+
 
 
 #

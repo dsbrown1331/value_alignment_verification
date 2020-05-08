@@ -1,6 +1,16 @@
-import mdp
+import sys
+import os
+exp_path = os.path.dirname(os.path.abspath(__file__))
+print(exp_path)
+project_path = os.path.abspath(os.path.join(exp_path, ".."))
+sys.path.insert(0, project_path)
+print(sys.path)
+
+import src.mdp as mdp
 import numpy as np
-import machine_teaching
+import src.machine_teaching as machine_teaching
+import src.utils as utils
+from src.traj_pair import TrajPair
 
 def create_aaai19_toy_world():
     #features is a 2-d array of tuples
@@ -222,16 +232,12 @@ def debug_demonstrations():
 
     import time
 
-    print("values")
-    t0 = time.time()
-    V = mdp.value_iteration(world)
-    t1 = time.time()
-    world.print_map(V)
-    print(t1-t0)
-
+    print("features")
+    utils.display_onehot_state_features(world)
 
     
-    Q = mdp.compute_q_values(world, V)
+    
+    Q = mdp.compute_q_values(world)
     #print("Q-values")
     #print(Q)
 
@@ -242,10 +248,22 @@ def debug_demonstrations():
     world.print_map(world.to_arrows(opt_policy))
 
     print(world.terminals)
-    
-    demo = mdp.generate_demonstration((4,4), opt_policy, world, 100)
-    for (s,a) in demo:
+    print("demo 1")
+    demoA = utils.optimal_rollout_from_Qvals((1,1), 3, Q, world, 0.0001)
+    for (s,a) in demoA:
         print("({},{})".format(s,world.to_arrow(a)))
+    print(mdp.calculate_trajectory_feature_counts(demoA, world))
+
+    print()
+    print("demo 2")
+    demoB = utils.sa_optimal_rollout_from_Qvals((1,1), (0,1), 3, Q, world, 0.0001)
+    for (s,a) in demoB:
+        print("({},{})".format(s,world.to_arrow(a)))
+    print(mdp.calculate_trajectory_feature_counts(demoB, world))
+    
+    tpair = TrajPair(demoA, demoB, world, 0.0001)
+    print(world.weights)
+
 
     #HMM. optimal demos can go for a long time, do we need them to last for infinite horizon??
 
@@ -286,16 +304,17 @@ debug_demonstrations()
 #world = create_aaai19_toy_world_3features()
 #world = create_3_feature_world()
 #world = create_random_10x10_2feature()
-world = create_random_10x10_3feature()
+#world = create_random_10x10_3feature()
 
 
-world = create_multiple_optimal_action_mdp()
-teacher = machine_teaching.RankingTeacher(world, debug=False)
-##run this method if you want optimal for teaching BEC(\pi*) without boundary conditions.
-#teacher.get_optimal_value_alignment_tests()
+#TODO: test out multiple options
+# world = create_multiple_optimal_action_mdp()
+# teacher = machine_teaching.RankingTeacher(world, debug=False)
+# ##run this method if you want optimal for teaching BEC(\pi*) without boundary conditions.
+# #teacher.get_optimal_value_alignment_tests()
 
-##If we want a refined ranking BEC then we can run the following
-teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
+# ##If we want a refined ranking BEC then we can run the following
+# teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
 
 
 #done: use an LP solver cvx? to remove redundancies, hopefully won't have numerical issues I used to have...

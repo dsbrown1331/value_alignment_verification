@@ -1,5 +1,5 @@
 import numpy as np
-import utils
+import src.utils as utils
 import copy
 import random
 
@@ -135,6 +135,16 @@ class LinearFeatureGridWorld:
 
 
 #______________________________________________________________________________
+
+
+def calculate_trajectory_feature_counts(traj, mdp_world):
+    gamma = mdp_world.gamma
+    num_features = mdp_world.get_num_features()
+    traj_features = np.zeros(num_features)
+    for t, s_a in enumerate(traj):
+        s,a = s_a
+        traj_features += gamma ** t  * np.array(mdp_world.get_state_features(s))
+    return traj_features
 
 
 def calculate_expected_feature_counts(pi, mdp, epsilon=0.0001):

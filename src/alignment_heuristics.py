@@ -1,7 +1,7 @@
-import mdp
-import utils
+import src.mdp
+import src.utils
 import numpy as np
-from alignment_interface import Verifier
+from src.alignment_interface import Verifier
 
 class CriticalStateActionValueVerifier(Verifier):
     def __init__(self, mdp_world, critical_threshold, precision = 0.0001, debug=False):
