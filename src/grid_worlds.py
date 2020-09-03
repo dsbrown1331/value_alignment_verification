@@ -1,5 +1,5 @@
 """A variety of prebuild worlds for debugging and testing"""
-import mdp
+import src.mdp as mdp
 import numpy as np
 
 

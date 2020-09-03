@@ -1,14 +1,14 @@
-import experiment_utils as eutils
-import utils
-import mdp
-import machine_teaching
+import src.experiment_utils as eutils
+import src.utils as utils
+import src.mdp as mdp
+import src.machine_teaching as machine_teaching
 import copy
 import numpy as np
-import value_alignment_verification as vav
-import alignment_heuristics as ah
+import src.value_alignment_verification as vav
+import src.alignment_heuristics as ah
 import random
 import sys
-import gridNxNexhaustive as mdp_gen
+import src.gridNxNexhaustive as mdp_gen
 import data_analysis.mdp_family_teaching.twoFeatureFeasibleRegionPlot as plot_aec
 import data_analysis.plot_grid as mdp_plot
 import matplotlib.pyplot as plt
@@ -41,7 +41,6 @@ random.seed(init_seed)
 
 #state_features = eutils.create_random_features_row_col_m(num_rows, num_cols, num_features)
 #print("state features\n",state_features)
-
 
 unique_mdps = mdp_gen.get_all_unique_mdps(num_features, grid_length, use_terminal, max_mdps)
 mdp_family = []

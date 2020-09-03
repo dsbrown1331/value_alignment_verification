@@ -11,7 +11,7 @@ import numpy as np
 import pylab as pl
 from matplotlib import collections  as mc
 
-def plot_feasible_region(halfspaces, non_redundants, filename=False, large=False):
+def plot_feasible_region(halfspaces, non_redundants, filename=False, large=False, show=False):
 
     if large:
         upper = 10
@@ -78,10 +78,10 @@ def plot_feasible_region(halfspaces, non_redundants, filename=False, large=False
     #            in_intersection = False
     #    if in_intersection:
     #        plt.plot(rand_sample[0],rand_sample[1],'.')
-    if not filename:
-        plt.show()
-    else:
+    if filename:
         plt.savefig(filename)
+    elif show:
+        plt.show()
 
 
 

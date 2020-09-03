@@ -1,7 +1,8 @@
-import src.mdp
-import src.utils
+import src.mdp as mdp
+import src.utils as utils
 import numpy as np
 from src.alignment_interface import Verifier
+import random
 
 class CriticalStateActionValueVerifier(Verifier):
     def __init__(self, mdp_world, critical_threshold, precision = 0.0001, debug=False):
@@ -15,12 +16,17 @@ class CriticalStateActionValueVerifier(Verifier):
         #find critical states
         self.critical_state_actions = []
         for s in self.mdp_world.states:
-            #get best qvalue
-            best_action = utils.argmax(self.mdp_world.actions(s), lambda a: self.q_values[s,a])
+            #get all optimal actions
+            best_actions = self.optimal_policy[s]
             average_qvalue = np.mean([self.q_values[s,a] for a in self.mdp_world.actions(s)])
-            if  self.q_values[s, best_action] - average_qvalue > self.critical_threshold:
-                self.critical_state_actions.append((s,best_action))
+            if  self.q_values[s, best_actions[0]] - average_qvalue > self.critical_threshold:
+                #add all the optimal actions as possibilities
+                self.critical_state_actions.append((s, best_actions))
         print("Number of critical states", len(self.critical_state_actions))
+        if self.debug:
+            print("critical states")
+            for cs in self.critical_state_actions:
+                print("state:", cs[0], "critical actions:", [self.mdp_world.to_arrow(a) for a in cs[1]] ) 
 
     def get_size_verification_test(self):
         return len(self.critical_state_actions)
@@ -30,23 +36,20 @@ class CriticalStateActionValueVerifier(Verifier):
 
 
         #Need to ask the agent what it would do in each setting. Just need access to agent's policy
-        for s,a in self.critical_state_actions:
+        for s,a_list in self.critical_state_actions:
             if self.debug:
-                print("Testing critical state: ({}, {})".format(s, self.mdp_world.to_arrow(a)))
-                print("policy", agent_policy)
+                print("Testing critical state: ({}), actions {}".format(s, [self.mdp_world.to_arrow(a) for a in a_list]))
+                print("subject policy", agent_policy)
                 print(type(agent_policy[s]))
-            if type(agent_policy[s]) is list: #stochastic optimal policy
-                if a not in agent_policy[s]:
-                    if self.debug:
-                        print("Critical action is not an optimal action for the agent")
-                    return False
-            else:
-                #just a deterministic policy
-                if a != agent_policy[s]:
-                    if self.debug:
-                        print("Critical action is not the optimal action for the agent")
-                    return False
-        
+                print("tester policy")
+                print(self.optimal_policy)
+            
+            agent_action_sample = random.choice(agent_policy[s])
+            if agent_action_sample not in a_list:
+                if self.debug:
+                    print("Sampled agent action", agent_action_sample, "not equal to a critical action in ", a_list)
+                return False
+            
             if self.debug:
                 print("correct answer")
         return True

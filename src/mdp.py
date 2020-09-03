@@ -13,7 +13,7 @@ class LinearFeatureGridWorld:
         self.features = features
         self.weights = copy.copy(weights)
         self.initials=initials
-        self.actlist=[(-1,0), (1,0), (0,-1), (0,1)] #up, down, left, right
+        self.actlist=[(0,-1),(-1,0), (0,1), (1,0)  ] #up, down, left, right
         self.terminals=terminals
         self.gamma=gamma
         self.rows, self.cols = len(features), len(features[0])

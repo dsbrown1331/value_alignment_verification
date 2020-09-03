@@ -59,7 +59,7 @@ def plot_dashed_arrow(state, width, ax, direction):
     print(x_end, y_end)
     ax.arrow(x_coord, y_coord, x_end, y_end, head_width=0.2, head_length=h_length, fc='k', ec='k',linewidth=4, fill=False,length_includes_head = True) 
 
-def plot_arrow(state, width, ax, direction):
+def plot_arrow(state, width, ax, direction, arrow_color='k'):
     print("plotting arrow", direction)
     h_length = 0.15
     shaft_length = 0.4
@@ -84,7 +84,7 @@ def plot_arrow(state, width, ax, direction):
         print("ERROR: ", direction, " is not a valid action")
         return
     print(x_end, y_end)
-    ax.arrow(x_coord, y_coord, x_end, y_end, head_width=0.2, head_length=h_length, fc='k', ec='k',linewidth=4) 
+    ax.arrow(x_coord, y_coord, x_end, y_end, head_width=0.2, head_length=h_length, fc=arrow_color, ec=arrow_color,linewidth=4) 
 
 def plot_dot(state, width, ax):
     ax.plot(state % width, state // width, 'ko',markersize=10)
@@ -143,7 +143,7 @@ def plot_optimal_policy(pi, feature_mat):
     #cbar.ax.tick_params(labelsize=20) 
     plt.show()
 
-def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False):
+def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False, show=False, arrow_color='k'):
     #takes a dictionary of policy optimal actions
     #takes a 2d array of feature vectors
     plt.figure()
@@ -162,13 +162,13 @@ def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False):
                     plot_dot(count, cols, ax)
                 else:
                     if a == (-1,0):
-                        plot_arrow(count, cols, ax, "up")
+                        plot_arrow(count, cols, ax, "up", arrow_color)
                     elif a == (1,0): 
-                        plot_arrow(count, cols, ax, "down")
+                        plot_arrow(count, cols, ax, "down", arrow_color)
                     elif a == (0,1):
-                        plot_arrow(count, cols, ax, "right")
+                        plot_arrow(count, cols, ax, "right", arrow_color)
                     elif a == (0,-1):
-                        plot_arrow(count, cols, ax, "left")
+                        plot_arrow(count, cols, ax, "left", arrow_color)
                     elif a is None:
                         plot_dot(count, cols, ax)
                     elif a is "w":
@@ -176,7 +176,7 @@ def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False):
                         pass
                     else:
                         print("error in policy format")
-                        sys.exit()
+                        #sys.exit()
             count += 1
 
     print(feature_mat)
@@ -192,7 +192,7 @@ def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False):
             feature_set.add(m)
     num_features = len(feature_set)
     print(mat)
-    all_colors = ['black','white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan']
+    all_colors = ['black','white','tab:gray','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange',  'tab:cyan']
     colors_to_use = []
     for f in range(9):#hard coded to only have 9 features right now
         if f in feature_set:
@@ -225,7 +225,7 @@ def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False):
     plt.tight_layout()
     if filename:
         plt.savefig(filename)
-    else:
+    elif show:
         plt.show()
 
 
@@ -244,13 +244,13 @@ def plot_optimal_policy_vav_grid(pis, feature_mats, g_rows, g_cols, walls=False,
             feature_mat = feature_mats[cnt]
             cnt += 1
             count = 0
-            print(pi)
+            #print(pi)
             rows,cols = len(feature_mat), len(feature_mat[0])
             for r in range(rows):
                 for c in range(cols):
                     opt_actions = pi[(r,c)]
                     for a in opt_actions:
-                        print("optimal action", a)
+             #           print("optimal action", a)
                         # could be a stochastic policy with more than one optimal action
                         if a is None:
                             plot_dot(count, cols, ax)
@@ -273,7 +273,7 @@ def plot_optimal_policy_vav_grid(pis, feature_mats, g_rows, g_cols, walls=False,
                                 sys.exit()
                     count += 1
 
-            print(feature_mat)
+            # print(feature_mat)
             
             #use for wall states
             #if walls:
@@ -285,7 +285,7 @@ def plot_optimal_policy_vav_grid(pis, feature_mats, g_rows, g_cols, walls=False,
                 for m in mrow:
                     feature_set.add(m)
             num_features = len(feature_set)
-            print(mat)
+            # print(mat)
             all_colors = ['black','white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan']
             colors_to_use = []
             for f in range(9):#hard coded to only have 9 features right now
