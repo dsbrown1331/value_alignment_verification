@@ -5,13 +5,13 @@ from src.alignment_interface import Verifier
 import random
 
 class CriticalStateActionValueVerifier(Verifier):
-    def __init__(self, mdp_world, critical_threshold, precision = 0.0001, debug=False):
+    def __init__(self, mdp_world, Q, opt_policy, critical_threshold, precision = 0.0001, debug=False):
         self.mdp_world = mdp_world
         self.critical_threshold = critical_threshold
         self.precision = precision
         self.debug = debug
-        self.q_values = mdp.compute_q_values(mdp_world, eps = precision)
-        self.optimal_policy = mdp.find_optimal_policy(mdp_world, Q=self.q_values, epsilon=precision)
+        self.q_values = Q#mdp.compute_q_values(mdp_world, eps = precision)
+        self.optimal_policy = opt_policy#mdp.find_optimal_policy(mdp_world, Q=self.q_values, epsilon=precision)
 
         #find critical states
         self.critical_state_actions = []
@@ -44,6 +44,7 @@ class CriticalStateActionValueVerifier(Verifier):
                 print("tester policy")
                 print(self.optimal_policy)
             
+            #sample an action from the subject's policy and check if it is optimal under tester's reward function
             agent_action_sample = random.choice(agent_policy[s])
             if agent_action_sample not in a_list:
                 if self.debug:

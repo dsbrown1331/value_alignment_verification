@@ -12,7 +12,7 @@ class LinearFeatureGridWorld:
     def __init__(self, features, weights, initials, terminals, gamma=.95):
         self.features = features
         self.weights = copy.copy(weights)
-        self.initials=initials
+        self.initials=initials #assumes uniform distribution
         self.actlist=[(0,-1),(-1,0), (0,1), (1,0)  ] #up, down, left, right
         self.terminals=terminals
         self.gamma=gamma
@@ -219,7 +219,25 @@ def value_iteration(mdp, epsilon=0.0001):
             delta = max(delta, abs(V1[s] - V[s]))
         #print V1
         if delta < epsilon * (1 - gamma) / gamma:
-            return V
+            return V1
+
+#evaluate a policy under an MDP, return values per state
+def policy_evaluation(pi, mdp, epsilon=0.0001):
+    "Solving an MDP by value iteration."
+    V1 = dict([(s, 0) for s in mdp.states])
+    R, T, gamma = mdp.R, mdp.T, mdp.gamma
+    while True:
+        V = V1.copy()
+        delta = 0
+        for s in mdp.states:
+            V1[s] = R(s) + gamma * sum([p * V[s1] for (p, s1) in T(s, pi[s][0])])
+                                        
+            delta = max(delta, abs(V1[s] - V[s]))
+        #print V1
+        if delta < epsilon * (1 - gamma) / gamma:
+            return V1
+
+
 
 
 def compute_q_values(mdp, V=None, eps = 0.0001):
@@ -264,7 +282,7 @@ def expected_utility(a, s, U, mdp):
 
 
 #TODO what is a good value for k?
-def policy_evaluation(pi, U, mdp, k=100):
+def policy_evaluation_old(pi, U, mdp, k=100):
     """Return an updated utility mapping U from each state in the MDP to its 
     utility, using an approximation (modified policy iteration)."""
     R, T, gamma = mdp.R, mdp.T, mdp.gamma

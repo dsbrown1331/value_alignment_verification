@@ -3,19 +3,20 @@ import src.utils as utils
 import numpy as np
 from src.alignment_interface import Verifier
 import src.mdp as mdp
+import random
 
 class SCOTVerificationTester(Verifier):
     """takes the machine teaching set of trajectories from SCOT and asks the agent being tested to fill in the actions it would take 
         in each state
     """
-    def __init__(self, mdp_world, precision, num_rollouts, rollout_length, debug=False):
+    def __init__(self, mdp_world, Q, opt_policy, precision, num_rollouts, rollout_length, debug=False):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        self.q_values = mdp.compute_q_values(mdp_world, eps = precision)
-        self.optimal_policy = mdp.find_optimal_policy(mdp_world, Q=self.q_values, epsilon=precision)
+        #self.q_values = mdp.compute_q_values(mdp_world, eps = precision)
+        self.optimal_policy = opt_policy#mdp.find_optimal_policy(mdp_world, Q=self.q_values, epsilon=precision)
 
-        teacher = machine_teaching.SCOT(mdp_world, precision, num_rollouts, rollout_length, debug=self.debug)
+        teacher = machine_teaching.SCOT(mdp_world, Q, opt_policy, precision, num_rollouts, rollout_length, compare_optimal=False, debug=self.debug)
 
         self.demos = teacher.get_machine_teaching_demos()
         self.query_sa_pairs = set()
@@ -39,21 +40,26 @@ class SCOTVerificationTester(Verifier):
             for s,a in self.query_sa_pairs:
                 print(s,self.mdp_world.to_arrow(a))
         
+
+        #for every state in the machine teaching trajectories test action
         for s,a in self.query_sa_pairs:
             if self.debug:
                 print("Testing teaching state: ({}, {})".format(s, self.mdp_world.to_arrow(a)))
                 print("policy", agent_policy)
                 print(type(agent_policy[s]))
             if type(agent_policy[s]) is list: #stochastic optimal policy
-                if a not in agent_policy[s]:
+                #randomly sample action from policy and check if optimal
+                agent_action_sample = random.choice(agent_policy[s])
+                if agent_action_sample not in self.optimal_policy[s]:
                     if self.debug:
-                        print("Machine teaching action is not an optimal action for the agent")
+                        print("Sampled agent action", agent_action_sample, "not equal to a critical action in ", self.optimal_policy[s])
                     return False
+            
             else:
                 #just a deterministic policy
-                if a != agent_policy[s]:
+                if agent_policy[s] not in self.optimal_policy[s]:
                     if self.debug:
-                        print("Machine teaching action is not the optimal action for the agent")
+                        print("Action action", agent_policy[s], "not in Machine teaching opt action set")
                     return False
         
             if self.debug:
@@ -64,14 +70,22 @@ class HalfspaceVerificationTester(Verifier):
     """takes an MDP and an agent and tests whether the agent has value alignment
        by taking the agent's reward function and testing whether it is in the AEC(\pi^*)
     """
-    def __init__(self, mdp_world, precision, debug=False, use_suboptimal_rankings = False):
+    def __init__(self, mdp_world, Q, opt_policy, precision, debug=False, use_suboptimal_rankings = False, epsilon_gap=0.0,
+                    teacher=None, tests=None, halfspaces=None):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
-        teacher = machine_teaching.StateActionRankingTeacher(mdp_world, debug=self.debug, epsilon=precision)
+        self.epsilon_gap = epsilon_gap
+        if teacher:
+            teacher = teacher
+        else:
+            teacher = machine_teaching.StateActionRankingTeacher(mdp_world, Q, opt_policy, debug=self.debug, epsilon=precision)
         
         #TODO: we don't need the tests, just the halfspaces, but we do need to know which are equality
-        tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
+        if tests and halfspaces:
+            tests, self.halfspaces = tests, halfspaces
+        else:
+            tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False, compare_optimal = False, epsilon_gap=self.epsilon_gap)
 
         #for now let's just select the first question for each halfspace
         self.test = [questions[0] for questions in tests]
@@ -117,17 +131,17 @@ class TrajectoryRankingBasedTester(Verifier):
        assumes that tests are of the form of do you think trajectory a is better than or equally preferred to trajectory b?
        Current implementation accesses agent's reward function under the hood to test this
     """
-    def __init__(self, mdp_world, precision, horizon, debug=False, use_suboptimal_rankings = False):
+    def __init__(self, mdp_world, Q, opt_policy, precision, horizon, debug=False, use_suboptimal_rankings = False):
         self.mdp_world = mdp_world
         self.precision = precision
         self.debug = debug
 
         #first get the AEC halfspaces
-        teacher = machine_teaching.TrajectoryRankingTeacher(mdp_world, precision=precision, horizon=horizon, debug=self.debug, )
+        teacher = machine_teaching.TrajectoryRankingTeacher(mdp_world, Q, opt_policy, precision=precision, horizon=horizon, debug=self.debug,use_suboptimal_rankings=use_suboptimal_rankings)
 
         #let's test if we can use trajectories to make the AEC redundant (this should always be possible when two features aren't equal reward and transitions are deterministic)
         #test is a list of TrajPairs and halfspaces is a matrix of halfspace normals as rows
-        self.test, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings)
+        self.test, self.halfspaces = teacher.get_optimal_value_alignment_tests()
 
         
         
@@ -237,6 +251,95 @@ class RankingBasedTester(Verifier):
                 print("correct answer")
         return True
 
+
+
+class ARPBlackBoxTester(Verifier):
+    """takes an MDP and an agent and tests whether the agent has value alignment
+       Tests agent by asking for optimal action in states that are part of the non-redundant halfspace
+       constraints. If subject's action is optimal under tester's reward then predict aligned
+    """
+    def __init__(self, mdp_world, Q, opt_policy, precision, debug=False, remove_redundancy_lp = True,
+                teacher=None, tests=None, halfspaces=None):
+        self.mdp_world = mdp_world
+        self.precision = precision
+        self.debug = debug
+        self.q_values = Q#mdp.compute_q_values(mdp_world, eps = precision)
+        self.optimal_policy = opt_policy#mdp.find_optimal_policy(mdp_world, Q=self.q_values, epsilon=precision)
+
+        if teacher:
+            teacher = teacher
+        else:
+            teacher = machine_teaching.StateActionRankingTeacher(mdp_world, Q, opt_policy, debug=self.debug, epsilon=precision)
+        
+        #TODO: we don't need the tests, just the halfspaces, but we do need to know which are equality
+        if tests and halfspaces:
+            self.tests, self.halfspaces = tests, halfspaces
+        else:
+            self.tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False, compare_optimal = False)
+
+
+        # teacher = machine_teaching.StateActionRankingTeacher(mdp_world, Q, opt_policy, debug=self.debug, remove_redundancy_lp = remove_redundancy_lp, epsilon=precision)
+
+        # self.tests, self.halfspaces = teacher.get_optimal_value_alignment_tests(use_suboptimal_rankings = False)
+
+        #for now let's just select the first question for each halfspace
+        self.test = [questions[0] for questions in self.tests]
+
+    def get_size_verification_test(self):
+        return len(self.test)
+
+    def is_agent_value_aligned(self, agent_policy, agent_q_values, reward_weights):
+
+        #Need to ask the agent what it would do in each setting. Need access to agent Q-values...
+        for question in self.test:
+            if self.debug:
+                print("Testing question:")
+                utils.print_question(question, self.mdp_world)
+            
+            if len(question) == 2:
+                (s,worse), (s,better) = question
+                if self.debug:
+                    print("Qw({},{}) = {}, \nQb({},{}) = {}".format(s, worse, agent_q_values[(s,worse)], s, better, agent_q_values[(s,better)]))
+                
+                if type(agent_policy[s]) is list: #stochastic optimal policy
+                    #randomly sample action from policy and check if optimal
+                    agent_action_sample = random.choice(agent_policy[s])
+                    if agent_action_sample not in self.optimal_policy[s]:
+                        if self.debug:
+                            print("Sampled agent action", agent_action_sample, "not equal to a critical action in ", self.optimal_policy[s])
+                        return False
+                
+                else:
+                    #just a deterministic policy
+                    if agent_policy[s] not in self.optimal_policy[s]:
+                        if self.debug:
+                            print("Action action", agent_policy[s], "not in Machine teaching opt action set")
+                        return False
+            
+                if self.debug:
+                    print("correct answer")
+            else:
+                (s,worse), (s,better), equivalent = question
+                print("Qw({},{}) = {}, \nQb({},{}) = {}".format(s, worse, agent_q_values[(s,worse)], s, better, agent_q_values[(s,better)]))
+
+                if type(agent_policy[s]) is list: #stochastic optimal policy
+                    #randomly sample action from policy and check if optimal
+                    agent_action_sample = random.choice(agent_policy[s])
+                    if agent_action_sample not in self.optimal_policy[s]:
+                        if self.debug:
+                            print("Sampled agent action", agent_action_sample, "not equal to a critical action in ", self.optimal_policy[s])
+                        return False
+                
+                else:
+                    #just a deterministic policy
+                    if agent_policy[s] not in self.optimal_policy[s]:
+                        if self.debug:
+                            print("Action action", agent_policy[s], "not in Machine teaching opt action set")
+                        return False
+            
+                if self.debug:
+                    print("correct answer")
+        return True
 
 
 class OptimalRankingBasedTester(Verifier):

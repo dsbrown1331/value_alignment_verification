@@ -4,7 +4,7 @@ from matplotlib import colors
 import sys
 
 
-def plot_dashed_arrow(state, width, ax, direction):
+def plot_dashed_arrow(state, width, ax, direction, arrow_color='k'):
     print("plotting dashed arrow", direction)
     h_length = 0.15
     shaft_length = 0.4
@@ -31,7 +31,7 @@ def plot_dashed_arrow(state, width, ax, direction):
         return
     print(x_end, y_end)
     
-    ax.arrow(x_coord, y_coord, x_end, y_end, head_width=None, head_length=None, fc='k', ec='k',linewidth=4, linestyle=':',fill=False) 
+    ax.arrow(x_coord, y_coord, x_end, y_end, head_width=None, head_length=None, fc=arrow_color, ec=arrow_color,linewidth=4, linestyle=':',fill=False) 
     
     #convert state to coords where (0,0) is top left
     x_coord = state % width
@@ -57,7 +57,7 @@ def plot_dashed_arrow(state, width, ax, direction):
         print("ERROR: ", direction, " is not a valid action")
         return
     print(x_end, y_end)
-    ax.arrow(x_coord, y_coord, x_end, y_end, head_width=0.2, head_length=h_length, fc='k', ec='k',linewidth=4, fill=False,length_includes_head = True) 
+    ax.arrow(x_coord, y_coord, x_end, y_end, head_width=0.2, head_length=h_length,  fc=arrow_color, ec=arrow_color,linewidth=4, fill=False,length_includes_head = True) 
 
 def plot_arrow(state, width, ax, direction, arrow_color='k'):
     print("plotting arrow", direction)
@@ -88,6 +88,9 @@ def plot_arrow(state, width, ax, direction, arrow_color='k'):
 
 def plot_dot(state, width, ax):
     ax.plot(state % width, state // width, 'ko',markersize=10)
+    
+def plot_questionmark(state, width, ax):
+    ax.plot(state % width, state // width, 'k', marker=r'$?$',markersize=40)
     
 
 def plot_optimal_policy(pi, feature_mat):
@@ -143,7 +146,7 @@ def plot_optimal_policy(pi, feature_mat):
     #cbar.ax.tick_params(labelsize=20) 
     plt.show()
 
-def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False, show=False, arrow_color='k'):
+def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False, show=False, arrow_color='k', feature_colors = None):
     #takes a dictionary of policy optimal actions
     #takes a 2d array of feature vectors
     plt.figure()
@@ -154,29 +157,30 @@ def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False, show=F
     rows,cols = len(feature_mat), len(feature_mat[0])
     for r in range(rows):
         for c in range(cols):
-            opt_actions = pi[(r,c)]
-            for a in opt_actions:
-                print("optimal action", a)
-                # could be a stochastic policy with more than one optimal action
-                if a is None:
-                    plot_dot(count, cols, ax)
-                else:
-                    if a == (-1,0):
-                        plot_arrow(count, cols, ax, "up", arrow_color)
-                    elif a == (1,0): 
-                        plot_arrow(count, cols, ax, "down", arrow_color)
-                    elif a == (0,1):
-                        plot_arrow(count, cols, ax, "right", arrow_color)
-                    elif a == (0,-1):
-                        plot_arrow(count, cols, ax, "left", arrow_color)
-                    elif a is None:
+            if feature_mat[r][c]:
+                opt_actions = pi[(r,c)]
+                for a in opt_actions:
+                    print("optimal action", a)
+                    # could be a stochastic policy with more than one optimal action
+                    if a is None:
                         plot_dot(count, cols, ax)
-                    elif a is "w":
-                        #wall
-                        pass
                     else:
-                        print("error in policy format")
-                        #sys.exit()
+                        if a == (-1,0):
+                            plot_arrow(count, cols, ax, "up", arrow_color)
+                        elif a == (1,0): 
+                            plot_arrow(count, cols, ax, "down", arrow_color)
+                        elif a == (0,1):
+                            plot_arrow(count, cols, ax, "right", arrow_color)
+                        elif a == (0,-1):
+                            plot_arrow(count, cols, ax, "left", arrow_color)
+                        elif a is None:
+                            plot_dot(count, cols, ax)
+                        elif a is "w":
+                            #wall
+                            pass
+                        else:
+                            print("error in policy format")
+                            #sys.exit()
             count += 1
 
     print(feature_mat)
@@ -192,7 +196,10 @@ def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False, show=F
             feature_set.add(m)
     num_features = len(feature_set)
     print(mat)
-    all_colors = ['black','white','tab:gray','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange',  'tab:cyan']
+    if feature_colors is None:
+        all_colors = ['black','white','tab:red','tab:blue','tab:gray','tab:green','tab:purple', 'tab:orange',  'tab:cyan']
+    else:
+        all_colors = feature_colors
     colors_to_use = []
     for f in range(9):#hard coded to only have 9 features right now
         if f in feature_set:
@@ -226,6 +233,235 @@ def plot_optimal_policy_vav(pi, feature_mat, walls=False, filename=False, show=F
     if filename:
         plt.savefig(filename)
     elif show:
+        plt.show()
+
+
+def plot_test_questions(question_list, feature_mat, walls=False, filename=False, show=False, arrow_color='k', feature_colors = None):
+    #takes a dictionary of policy optimal actions
+    #takes a 2d array of feature vectors
+    plt.figure()
+
+    ax = plt.axes() 
+    count = 0
+    
+    rows,cols = len(feature_mat), len(feature_mat[0])
+    for r in range(rows):
+        for c in range(cols):
+            if feature_mat[r][c]:
+                for (s,a) in question_list:
+                    if s == (r,c):
+                        if type(a) is list:
+                            opt_actions = a
+                        else:
+                            opt_actions = [a]
+                        for a in opt_actions:
+                            print("optimal action", a)
+                            # could be a stochastic policy with more than one optimal action
+                            if a is None:
+                                #plot_dot(count, cols, ax)
+                                continue # don't plot anything at terminal no choice there anyways
+                            else:
+                                # if a == (-1,0):
+                                #     plot_arrow(count, cols, ax, "up", arrow_color)
+                                # elif a == (1,0): 
+                                #     plot_arrow(count, cols, ax, "down", arrow_color)
+                                # elif a == (0,1):
+                                #     plot_arrow(count, cols, ax, "right", arrow_color)
+                                # elif a == (0,-1):
+                                #     plot_arrow(count, cols, ax, "left", arrow_color)
+                                # elif a is None:
+                                plot_questionmark(count, cols, ax)
+                                # elif a is "w":
+                                #     #wall
+                                #     pass
+                                # else:
+                                #     print("error in policy format")
+                                #     #sys.exit()
+            count += 1
+
+    print(feature_mat)
+    
+    #use for wall states
+    #if walls:
+    mat = [[0 if fvec is None else fvec.index(1)+1 for fvec in row] for row in feature_mat]
+    
+    #mat =[[0,0],[2,2]]
+    feature_set = set()
+    for mrow in mat:
+        for m in mrow:
+            feature_set.add(m)
+    num_features = len(feature_set)
+    print(mat)
+    if feature_colors is None:
+        all_colors = ['black','white','tab:red','tab:blue','tab:gray','tab:green','tab:purple', 'tab:orange',  'tab:cyan']
+    else:
+        all_colors = feature_colors
+    colors_to_use = []
+    for f in range(9):#hard coded to only have 9 features right now
+        if f in feature_set:
+            colors_to_use.append(all_colors[f])
+    cmap = colors.ListedColormap(colors_to_use)
+    # else:
+    #     mat = [[fvec.index(1) for fvec in row] for row in feature_mat]
+    #     cmap = colors.ListedColormap(['white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan'])
+    
+    #input()
+    
+    #convert feature_mat into colors
+    #heatmap =  plt.imshow(mat, cmap="Reds", interpolation='none', aspect='equal')
+    
+    im = plt.imshow(mat, cmap=cmap, interpolation='none', aspect='equal')
+
+    ax = plt.gca()
+
+    ax.set_xticks(np.arange(-.5, cols, 1), minor=True);
+    ax.set_yticks(np.arange(-.5, rows, 1), minor=True);
+    #ax.grid(which='minor', axis='both', linestyle='-', linewidth=5, color='k')
+    # Gridlines based on minor ticks
+    ax.grid(which='minor', color='k', linestyle='-', linewidth=5)
+    ax.xaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_locator(plt.NullLocator())
+    ax.xaxis.set_major_locator(plt.NullLocator())
+    #cbar = plt.colorbar(heatmap)
+    #cbar.ax.tick_params(labelsize=20) 
+    plt.tight_layout()
+    if filename:
+        plt.savefig(filename)
+    if show:
+        plt.show()
+
+
+
+def plot_preference_query(good_traj, bad_traj, feature_mat, walls=False, filename=False, show=False, 
+                    good_arrow_color='b', bad_arrow_color='r', feature_colors = None):
+    #Takes in two trajs good and bad and plots good in solid and bad in dotted
+    
+    plt.figure()
+    ax = plt.axes() 
+    count = 0
+    rows,cols = len(feature_mat), len(feature_mat[0])
+    #plot good trajectory
+    arrow_color=good_arrow_color
+    for r in range(rows):
+        for c in range(cols):
+            if feature_mat[r][c]:
+                for (s,a) in good_traj:
+                    if s == (r,c):
+                        if type(a) is list:
+                            opt_actions = a
+                        else:
+                            opt_actions = [a]
+                        for a in opt_actions:
+                            print("optimal action", a)
+                            # could be a stochastic policy with more than one optimal action
+                            if a is None:
+                                plot_dot(count, cols, ax)
+                            else:
+                                if a == (-1,0):
+                                    plot_arrow(count, cols, ax, "up", arrow_color)
+                                elif a == (1,0): 
+                                    plot_arrow(count, cols, ax, "down", arrow_color)
+                                elif a == (0,1):
+                                    plot_arrow(count, cols, ax, "right", arrow_color)
+                                elif a == (0,-1):
+                                    plot_arrow(count, cols, ax, "left", arrow_color)
+                                elif a is None:
+                                    plot_dot(count, cols, ax)
+                                elif a is "w":
+                                    #wall
+                                    pass
+                                else:
+                                    print("error in policy format")
+                                    #sys.exit()
+            count += 1
+
+    #plot bad trajectory
+    arrow_color=bad_arrow_color
+    count = 0
+    for r in range(rows):
+        for c in range(cols):
+            if feature_mat[r][c]:
+                for (s,a) in bad_traj:
+                    if s == (r,c):
+                        if type(a) is list:
+                            opt_actions = a
+                        else:
+                            opt_actions = [a]
+                        for a in opt_actions:
+                            print("optimal action", a)
+                            # could be a stochastic policy with more than one optimal action
+                            if a is None:
+                                plot_dot(count, cols, ax)
+                            else:
+                                if a == (-1,0):
+                                    plot_dashed_arrow(count, cols, ax, "up", arrow_color)
+                                elif a == (1,0): 
+                                    plot_dashed_arrow(count, cols, ax, "down", arrow_color)
+                                elif a == (0,1):
+                                    plot_dashed_arrow(count, cols, ax, "right", arrow_color)
+                                elif a == (0,-1):
+                                    plot_dashed_arrow(count, cols, ax, "left", arrow_color)
+                                elif a is None:
+                                    plot_dot(count, cols, ax)
+                                elif a is "w":
+                                    #wall
+                                    pass
+                                else:
+                                    print("error in policy format")
+                                    #sys.exit()
+            count += 1
+
+   
+    
+    #use for wall states
+    #if walls:
+    mat = [[0 if fvec is None else fvec.index(1)+1 for fvec in row] for row in feature_mat]
+    
+    #mat =[[0,0],[2,2]]
+    feature_set = set()
+    for mrow in mat:
+        for m in mrow:
+            feature_set.add(m)
+    num_features = len(feature_set)
+    print(mat)
+    if feature_colors is None:
+        all_colors = ['black','white','tab:red','tab:blue','tab:gray','tab:green','tab:purple', 'tab:orange',  'tab:cyan']
+    else:
+        all_colors = feature_colors
+    colors_to_use = []
+    for f in range(9):#hard coded to only have 9 features right now
+        if f in feature_set:
+            colors_to_use.append(all_colors[f])
+    cmap = colors.ListedColormap(colors_to_use)
+    # else:
+    #     mat = [[fvec.index(1) for fvec in row] for row in feature_mat]
+    #     cmap = colors.ListedColormap(['white','tab:red','tab:blue','tab:green','tab:purple', 'tab:orange', 'tab:gray', 'tab:cyan'])
+    
+    #input()
+    
+    #convert feature_mat into colors
+    #heatmap =  plt.imshow(mat, cmap="Reds", interpolation='none', aspect='equal')
+    
+    im = plt.imshow(mat, cmap=cmap, interpolation='none', aspect='equal')
+
+    ax = plt.gca()
+
+    ax.set_xticks(np.arange(-.5, cols, 1), minor=True);
+    ax.set_yticks(np.arange(-.5, rows, 1), minor=True);
+    #ax.grid(which='minor', axis='both', linestyle='-', linewidth=5, color='k')
+    # Gridlines based on minor ticks
+    ax.grid(which='minor', color='k', linestyle='-', linewidth=5)
+    ax.xaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_formatter(plt.NullFormatter())
+    ax.yaxis.set_major_locator(plt.NullLocator())
+    ax.xaxis.set_major_locator(plt.NullLocator())
+    #cbar = plt.colorbar(heatmap)
+    #cbar.ax.tick_params(labelsize=20) 
+    plt.tight_layout()
+    if filename:
+        plt.savefig(filename)
+    if show:
         plt.show()
 
 

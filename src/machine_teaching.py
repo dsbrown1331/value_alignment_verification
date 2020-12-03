@@ -15,7 +15,7 @@ class StateActionRankingTeacher:
     """takes an mdp world and returns the optimal teaching solution to teach the MDP
         
     """
-    def __init__(self, world, epsilon = 0.0001, debug=False, remove_redundancy_lp = True):
+    def __init__(self, world, Q, opt_policy, epsilon = 0.0001, debug=False, remove_redundancy_lp = True):
         self.world = world
         self.precision = epsilon
         self.debug = debug
@@ -25,13 +25,14 @@ class StateActionRankingTeacher:
         if self.debug:
             print("rewards")
             world.print_rewards()
-        V = mdp.value_iteration(world, epsilon=epsilon)
-        self.Q = mdp.compute_q_values(world, V, eps=epsilon)
+        #V = mdp.value_iteration(world, epsilon=epsilon)
+        self.Q = Q#mdp.compute_q_values(world, V, eps=epsilon)
         if self.debug:
+            V = mdp.value_iteration(world, epsilon=epsilon)
             print("values function")
             world.print_map(V)
 
-        self.opt_policy = mdp.find_optimal_policy(world, Q=self.Q, epsilon=epsilon)
+        self.opt_policy = opt_policy#mdp.find_optimal_policy(world, Q=self.Q, epsilon=epsilon)
         if self.debug:
             print("optimal policy")
             world.print_map(world.to_arrows(self.opt_policy))
@@ -42,11 +43,16 @@ class StateActionRankingTeacher:
         #    print(self.sa_fcounts[s,a])
 
 
-    def compute_halfspace_normals(self, use_suboptimal_rankings):
+    def compute_halfspace_normals(self, use_suboptimal_rankings, compare_optimal, epsilon_gap = 0.0):
         """ if use_suboptimal_rankings = False then it will only compute actions where preferred aciton is optimal
             if use_suboptimal_rankings = True, then it will find a BEC that could be much smaller than BEC(\pi^*) since it will consider rankings between all
             pairs of actions, even suboptimal ones. This will give the machine teaching set for teaching a ranking learner, I think...
+            if compare_optimal = True, then we include optimal action comparisons and induce hyperplane constraints, currently with ARP we don't need these since either action is okay
+            so we are okay with a reward function that picks one over the other since we have equal preferences.
+            
+            only keep halfspace constraints such that the better action is at least epsilon_gap better
         """
+        
         #for each state compute \Phi(s,a) - \Phi(s,b) for all a and b such that Q*(s,a) >= Q*(s,b)
         half_spaces = []
         arrow = self.world.to_arrow
@@ -63,14 +69,15 @@ class StateActionRankingTeacher:
                         #print("comparing action", arrow(action_i), "to action", arrow(action_j))
                         #figure out which one has higher Q-value
                         if np.abs(self.Q[s,action_i] - self.Q[s,action_j]) < self.precision:
-                            #print("action", arrow(action_i), "is equal to action", arrow(action_j))
-                            normal_vector1 = self.sa_fcounts[s, action_i] - self.sa_fcounts[s, action_j]
-                            normal_vector2 = self.sa_fcounts[s, action_j] - self.sa_fcounts[s, action_i]
-                            #print("appending two normal vectors", normal_vector1)
-                            #print("and", normal_vector1)
-                            if np.linalg.norm(normal_vector1) > self.precision:
-                                half_spaces.append(normal_vector1)
-                                half_spaces.append(normal_vector2)
+                            if compare_optimal: #check if we should add this
+                                #print("action", arrow(action_i), "is equal to action", arrow(action_j))
+                                normal_vector1 = self.sa_fcounts[s, action_i] - self.sa_fcounts[s, action_j]
+                                normal_vector2 = self.sa_fcounts[s, action_j] - self.sa_fcounts[s, action_i]
+                                #print("appending two normal vectors", normal_vector1)
+                                #print("and", normal_vector1)
+                                if np.linalg.norm(normal_vector1) > self.precision:
+                                    half_spaces.append(normal_vector1)
+                                    half_spaces.append(normal_vector2)
                         elif self.Q[s,action_i] > self.Q[s,action_j]:
                             #print("action", arrow(action_i), "is better")
                             normal_vector = self.sa_fcounts[s, action_i] - self.sa_fcounts[s, action_j]
@@ -89,10 +96,17 @@ class StateActionRankingTeacher:
                 opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a], self.precision)
                 for opt_a in opt_actions:
                     for action_b in actions:
+                        if action_b in opt_actions:
+                            if not compare_optimal:
+                                #skip this (s,a) pair if we aren't comparing optimal actions
+                                continue
+                            
                         normal_vector = self.sa_fcounts[s, opt_a] - self.sa_fcounts[s, action_b]
                         #don't add if zero
                         if np.linalg.norm(normal_vector) > self.precision:
-                            half_spaces.append(normal_vector)
+                            #don't add if not epsilon_gap better
+                            if np.dot(normal_vector, self.world.weights) > epsilon_gap:
+                                half_spaces.append(normal_vector)
 
         return half_spaces
 
@@ -258,10 +272,10 @@ class StateActionRankingTeacher:
                 test_question_lists[i].append(test_question)
 
 
-    def get_optimal_value_alignment_tests(self, use_suboptimal_rankings = False):
+    def get_optimal_value_alignment_tests(self, use_suboptimal_rankings = False, compare_optimal=False, epsilon_gap = 0.0):
         
-        #get raw halfspace normals for all action pairs at each state
-        halfspace_normals = self.compute_halfspace_normals(use_suboptimal_rankings)
+        #get raw halfspace normals for all action pairs at each state (only for ones that have greater than epsilon_gap in value diff)
+        halfspace_normals = self.compute_halfspace_normals(use_suboptimal_rankings, compare_optimal, epsilon_gap)
         #np.random.shuffle(halfspace_normals)
         ##Debug
         if self.debug:
@@ -304,13 +318,14 @@ class TrajectoryRankingTeacher(StateActionRankingTeacher):
     """
     
     
-    def __init__(self, world, precision, horizon, debug=False):
-        super().__init__(world, precision, debug)
+    def __init__(self, world, Q, opt_policy, precision, horizon, debug=False, use_suboptimal_rankings = False):
+        super().__init__(world, Q, opt_policy, precision, debug)
         self.horizon = horizon #how long to rollout the demos
+        self.use_suboptimal_rankings = use_suboptimal_rankings
         
     
 
-    def get_optimal_value_alignment_tests(self, use_suboptimal_rankings = False):
+    def get_optimal_value_alignment_tests(self):
 
         # #compute the AEC  #use this code for debugging and test the counter example
 
@@ -334,18 +349,21 @@ class TrajectoryRankingTeacher(StateActionRankingTeacher):
 
         #compute tests using trajectories (currently just taking all actions from each state and then following optimal policy)
         print("generating trajectory pairs")
-        trajpairs = self.generate_trajectory_pairs()
+        trajpairs = self.generate_trajectory_pairs(self.use_suboptimal_rankings)
 
         #compute the halfspace constraints for seeing if we can make all the expected feature count halfspaces redundant
         Hspace_trajs = []
         for t in trajpairs:
             if t.equivalence:
+                #current code doesn't add if equivalent
+                continue
                 #need to add halfspace constraint both ways
-                Hspace_trajs.append(t.halfspace)
-                Hspace_trajs.append(-t.halfspace)
+                #Hspace_trajs.append(t.halfspace)
+                #Hspace_trajs.append(-t.halfspace)
             else:
                 Hspace_trajs.append(t.halfspace)
         Hspace_trajs = np.array(Hspace_trajs)
+        #np.random.shuffle(Hspace_trajs)
 
         print("removing redundancies from trajectory halfspaces", len(Hspace_trajs))
         #okay, now remove the redundancies from Hspace_trajs
@@ -392,42 +410,55 @@ class TrajectoryRankingTeacher(StateActionRankingTeacher):
         return test_questions, H_minimal
     
 
-    def generate_trajectory_pairs(self):
+    def generate_trajectory_pairs(self, use_suboptimal_rankings):
         #Iterate through all states and actions, currently using suboptimals Create TrajPair and return 
         trajectory_pairs = []
         arrow = self.world.to_arrow #to make debugging actions human readable
+    
         for s in self.world.states:
             if self.debug:
                 print()
                 print("Computing trajectories for state", s)
             actions = self.world.actions(s)
-                
-            #seach over all action pairs for possible test questions
-            for i in range(len(actions)):
-                for j in range(i+1,len(actions)):
-                    action_i = actions[i]
-                    action_j = actions[j]
-                    
-                    if self.debug: print("comparing traj with initial action", arrow(action_i), "to action", arrow(action_j))
-                    
-                    #create tuple
-                    traj_i = utils.sa_optimal_rollout_from_Qvals(s, action_i, self.horizon, self.Q, self.world, self.precision)
-                    traj_j = utils.sa_optimal_rollout_from_Qvals(s, action_j, self.horizon, self.Q, self.world, self.precision)
-                    tpair = TrajPair(traj_i, traj_j, self.world, self.precision)
-                    #check if non-zero since zero halfspace constraints are trivial
-                    if np.linalg.norm(tpair.halfspace) > self.precision:
-                        trajectory_pairs.append(tpair)
-
+            if use_suboptimal_rankings:    
+                #seach over all action pairs for possible test questions
+                for i in range(len(actions)):
+                    for j in range(i+1,len(actions)):
+                        action_i = actions[i]
+                        action_j = actions[j]
+                        
+                        if self.debug: print("comparing traj with initial action", arrow(action_i), "to action", arrow(action_j))
+                        
+                        #create tuple
+                        traj_i = utils.sa_optimal_rollout_from_Qvals(s, action_i, self.horizon, self.Q, self.world, self.precision)
+                        traj_j = utils.sa_optimal_rollout_from_Qvals(s, action_j, self.horizon, self.Q, self.world, self.precision)
+                        tpair = TrajPair(traj_i, traj_j, self.world, self.precision)
+                        #check if non-zero since zero halfspace constraints are trivial
+                        if np.linalg.norm(tpair.halfspace) > self.precision:
+                            trajectory_pairs.append(tpair)
+            else:
+                opt_actions = utils.argmax_list(actions, lambda a: self.Q[s,a], self.precision)
+                for opt_a in opt_actions:
+                    for action_b in actions:
+                        if not action_b in opt_actions:
+                            traj_i = utils.sa_optimal_rollout_from_Qvals(s, opt_a, self.horizon, self.Q, self.world, self.precision)
+                            traj_j = utils.sa_optimal_rollout_from_Qvals(s, action_b, self.horizon, self.Q, self.world, self.precision)
+                            tpair = TrajPair(traj_i, traj_j, self.world, self.precision)
+                            #check if non-zero since zero halfspace constraints are trivial
+                            if np.linalg.norm(tpair.halfspace) > self.precision:
+                                trajectory_pairs.append(tpair)
+        #np.random.shuffle(trajectory_pairs)
         return trajectory_pairs
     
 
 
 #TODO: Test this with stochastic dynamics?
 class SCOT(StateActionRankingTeacher):
-    def __init__(self, world, precision, num_rollouts, rollout_length, debug=False):
-        super().__init__(world, precision, debug)
+    def __init__(self, world, Q, opt_policy, precision, num_rollouts, rollout_length, compare_optimal, debug=False):
+        super().__init__(world, Q, opt_policy, precision, debug)
         self.num_rollouts = num_rollouts
         self.rollout_length = rollout_length
+        self.compare_optimal = compare_optimal  #this parameter allows us to either compute the AEC(true) or the ARP(false).
 
     def generate_candidate_trajectories(self):
         trajs = []
@@ -498,7 +529,7 @@ class SCOT(StateActionRankingTeacher):
     def get_machine_teaching_demos(self):
         use_suboptimal_rankings = False
         #get raw halfspace normals for all action pairs at each state
-        halfspace_normals = self.compute_halfspace_normals(use_suboptimal_rankings)
+        halfspace_normals = self.compute_halfspace_normals(use_suboptimal_rankings, self.compare_optimal)
         #np.random.shuffle(halfspace_normals)
         ##Debug
         if self.debug:
@@ -560,18 +591,19 @@ class MdpFamilyTeacher(SCOT):
 
     '''
     
-    def __init__(self, mdp_family, precision, debug=False):
+    def __init__(self, mdp_family, precision, use_suboptimal_rankings, compare_optimal, debug=False):
         self.mdp_family = mdp_family
         self.precision = precision
         self.debug = debug
         self.mdp_halfspaces = []
+        self.compare_optimal
         all_halfspaces = []
         for i,mdp_world in enumerate(mdp_family):
             #print("\n",i)
             if self.debug: print(mdp_world.features)
             #get all halfspace constraints
             mteacher = StateActionRankingTeacher(mdp_world, epsilon = precision, debug=debug)
-            halfspace_normals = mteacher.compute_halfspace_normals(use_suboptimal_rankings=False)
+            halfspace_normals = mteacher.compute_halfspace_normals(use_suboptimal_rankings, compare_optimal)
             #accumulate halfspaces
             halfspaces = mteacher.preprocess_halfspace_normals(halfspace_normals)
             self.mdp_halfspaces.append(halfspaces)

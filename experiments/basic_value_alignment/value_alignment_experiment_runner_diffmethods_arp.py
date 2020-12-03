@@ -1,3 +1,5 @@
+#I want to rerun things with the ARP rather than the AEC...
+
 import sys
 import os
 exp_path = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +30,7 @@ def random_weights(num_features):
 
 init_seed = 1234
 num_trials = 50  #number of mdps with random rewards to try
-num_eval_policies_tries = 50
+num_eval_policies_tries = 50#200
 
 #scot params
 num_rollouts = 20
@@ -38,11 +40,12 @@ rollout_length = 30  #should be less than  np.log(eps * (1-gamma))/np.log(gamma)
 
 debug = False
 precision = 0.00001
-num_rows_list = [4]#,8,16]
-num_cols_list = [4]#,8,16]
-num_features_list = [4]#[2,3,4,5,6,7,8]
-#verifier_list = ['trajectory_aec',"ranking-halfspace","scot", "optimal_action","state-value-critical-1.0", "state-value-critical-0.7","state-value-critical-0.5","state-value-critical-0.2","state-value-critical-0.1","state-value-critical-0.01"]
-verifier_list = ['scott']
+num_rows_list = [4]#[4,8,16]
+num_cols_list = [4]#[4,8,16]
+num_features_list = [2,3,4,5,6,7,8]
+verifier_list =['arp-pref',"arp-bb", "arp-w","scot","state-value-critical-0.2"]
+#verifier_list =["arp-bb","scot", "arp-w","state-value-critical-0.2"]
+
 
 exp_data_dir = os.path.join(project_path, "results", "arp_version")
 
@@ -55,7 +58,7 @@ for num_features in num_features_list:
 
         result_writers = []
         for i, verifier_name in enumerate(verifier_list):
-            filename = "{}_states{}x{}_features{}.txt".format(verifier_name, num_rows, num_cols, num_features)
+            filename = "arp{}_states{}x{}_features{}.txt".format(verifier_name, num_rows, num_cols, num_features)
             full_path = os.path.join(exp_data_dir, filename)
             print("writing to", full_path)
             result_writers.append(open(full_path,'w'))
@@ -133,11 +136,8 @@ for num_features in num_features_list:
             print()
             print("Generating verification tests")
 
-            #TODO: run through all the verifiers and create tests for current MDP
-            #TODO: develop a common interface that they all implement 
+            #TODO: save computation by solving for halfspaces once for all testers
 
-            
-            #TODO: have a list of names
             for vindx, verifier_name in enumerate(verifier_list):
                 tester = None
                 size_verification_test = None
@@ -146,8 +146,12 @@ for num_features in num_features_list:
                     critical_value_thresh = float(verifier_name[len("state-value-critical-"):])
                     #print("critical value", critical_value_thresh)
                     tester = ah.CriticalStateActionValueVerifier(true_world, critical_value_thresh, precision=precision, debug=debug)
-                elif verifier_name == "ranking-halfspace":
+                
+                elif verifier_name == "arp-w":
                     tester = vav.HalfspaceVerificationTester(true_world, debug = debug, precision=precision)
+                
+                elif verifier_name =="arp-bb":
+                    tester = vav.ARPBlackBoxTester(true_world, precision, debug=debug)
 
                 elif verifier_name == "state-optimal-action_ranker":
                     tester = vav.RankingBasedTester(true_world, precision, debug=debug)
@@ -155,7 +159,7 @@ for num_features in num_features_list:
                 elif verifier_name == "optimal_action":
                     tester = vav.OptimalRankingBasedTester(true_world, precision, debug=debug)
                 
-                elif verifier_name == "trajectory_aec":
+                elif verifier_name == "arp-pref":
                     tester = vav.TrajectoryRankingBasedTester(true_world, precision, rollout_length, debug=debug)
 
                 elif verifier_name == "optimal_action_allquestions":

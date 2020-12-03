@@ -82,7 +82,9 @@ def is_redundant_constraint(h, H, epsilon=0.0001):
     
     if sol['status'] != 0: #not sure what to do here. Shouldn't ever be infeasible, so probably a numerical issue
         print("LP NOT SOLVABLE")
-        sys.exit()
+        print("IGNORING ERROR FOR NOW!!!!!!!!!!!!!!!!!!!")
+        #sys.exit()
+        return False #let's be safe and assume it's necessary...
     elif sol['fun'] < -epsilon: #if less than zero then constraint is needed to keep c^T w >=0
         return False
     else: #redundant since without constraint c^T w >=0
