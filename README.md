@@ -1,4 +1,4 @@
-# value_alignment_verification
+# value alignment verification
 
 Set up the conda environment. Really just needs numpy python3 and scipy.
 
